@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="520" font-family="sans-serif">
+<rect width="1100" height="520" fill="#fff"/>
+<defs><marker id="a" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="11" refX="12" refY="5.5" orient="auto"><path d="M0,0 L13,5.5 L0,11 z" fill="#334155"/></marker></defs>
+<g font-size="13" fill="#0f172a">
+<!-- sensors -->
+<rect x="20" y="40" width="190" height="300" rx="10" fill="#ecfdf5" stroke="#2f6f4f" stroke-width="2"/>
+<text x="115" y="66" text-anchor="middle" font-weight="bold" font-size="15">SENSORS</text>
+<text x="115" y="100" text-anchor="middle">DS18B20 temperature</text><text x="115" y="140" text-anchor="middle">Flame sensor (IR)</text>
+<text x="115" y="180" text-anchor="middle">Rain plate + board</text><text x="115" y="220" text-anchor="middle">HC-SR04 ultrasonic</text>
+<text x="115" y="260" text-anchor="middle">(water level)</text><text x="115" y="310" text-anchor="middle" fill="#64748b">MQ-2 smoke: not fitted</text>
+<!-- node -->
+<rect x="270" y="110" width="190" height="160" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="365" y="140" text-anchor="middle" font-weight="bold" font-size="15">SENSOR NODE</text>
+<text x="365" y="168" text-anchor="middle">ESP32 + Ra-02 LoRa</text><text x="365" y="192" text-anchor="middle">reads every 3 s</text>
+<text x="365" y="216" text-anchor="middle">builds JSON reading</text><text x="365" y="240" text-anchor="middle">flash queue (backlog)</text>
+<path d="M210 190 H268" stroke="#334155" stroke-width="3" marker-end="url(#a)"/>
+<!-- wifi path -->
+<path d="M460 150 H620" stroke="#16a34a" stroke-width="4"/>
+<text x="540" y="136" text-anchor="middle" font-weight="bold" fill="#15803d">Wi-Fi (normal path)</text>
+<!-- lora path -->
+<path d="M460 240 H520" stroke="#d97706" stroke-width="4" stroke-dasharray="9 6"/>
+<rect x="520" y="205" width="150" height="70" rx="10" fill="#fffbeb" stroke="#d97706" stroke-width="2"/>
+<text x="595" y="232" text-anchor="middle" font-weight="bold">LoRa GATEWAY</text><text x="595" y="254" text-anchor="middle">ESP32 + Ra-02</text>
+<text x="490" y="300" text-anchor="middle" font-weight="bold" fill="#b45309">LoRa 433 MHz</text><text x="490" y="318" text-anchor="middle" fill="#b45309">(when Wi-Fi fails)</text>
+<path d="M670 240 H718" stroke="#d97706" stroke-width="4" stroke-dasharray="9 6" marker-end="url(#a)"/>
+<!-- server -->
+<rect x="720" y="60" width="360" height="240" rx="10" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+<text x="900" y="88" text-anchor="middle" font-weight="bold" font-size="15">CONTROL STATION (laptop / server)</text>
+<text x="900" y="120" text-anchor="middle">Spring Boot (Java 21) REST API</text><text x="900" y="146" text-anchor="middle">H2 database (readings, incidents, logs)</text>
+<text x="900" y="172" text-anchor="middle">Alert rules &#8594; incidents</text><text x="900" y="198" text-anchor="middle">Officer login + audit log</text>
+<text x="900" y="224" text-anchor="middle">Web dashboard (map, charts, queue)</text>
+<path d="M620 150 H718" stroke="#16a34a" stroke-width="4" marker-end="url(#a)"/>
+<!-- officers -->
+<rect x="720" y="380" width="360" height="100" rx="10" fill="#fef2f2" stroke="#dc2626" stroke-width="2"/>
+<text x="900" y="410" text-anchor="middle" font-weight="bold" font-size="15">OFFICERS (browser)</text>
+<text x="900" y="436" text-anchor="middle">see incidents on the map, acknowledge,</text><text x="900" y="458" text-anchor="middle">dispatch resources, resolve</text>
+<path d="M900 300 V378" stroke="#334155" stroke-width="3" marker-end="url(#a)"/><path d="M880 378 V302" stroke="#334155" stroke-width="3" marker-end="url(#a)" opacity="0"/>
+</g></svg>

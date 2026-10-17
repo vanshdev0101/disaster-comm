@@ -99,6 +99,15 @@ void setup() {
 }
 
 void loop() {
+#ifndef NODE_LORA_ONLY
+  // If Wi-Fi wasn't there at boot (or dropped), keep retrying: the node must return to Wi-Fi on its own.
+  static uint32_t lastWifiTry;
+  if (WiFi.status() != WL_CONNECTED && millis() - lastWifiTry > 15000) {
+    lastWifiTry = millis();
+    WiFi.disconnect();
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+  }
+#endif
   String j = readingJson();
   Serial.println(j);
   if (post(j)) replay();
