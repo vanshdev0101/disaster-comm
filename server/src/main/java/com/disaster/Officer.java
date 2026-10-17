@@ -31,16 +31,18 @@ public class Officer {
     private final IncidentRepo incidents;
     private final ResourceRepo resources;
     private final Audit audit;
+    private final Thresholds thresholds;
 
-    Officer(IncidentRepo incidents, ResourceRepo resources, Audit audit) {
+    Officer(IncidentRepo incidents, ResourceRepo resources, Audit audit, Thresholds thresholds) {
         this.incidents = incidents;
         this.resources = resources;
         this.audit = audit;
+        this.thresholds = thresholds;
     }
 
     /** One unresolved incident per node+alert type, so a sensor that stays in alarm doesn't spam. */
     void raise(Reading r) {
-        for (String type : Api.alerts(r)) {
+        for (String type : thresholds.alerts(r)) {
             if (incidents.existsByNodeAndTypeAndStatusNot(r.node, type, "resolved")) continue;
             Incident i = new Incident();
             i.node = r.node; i.type = type; i.opened = r.recv; i.status = "open";

@@ -24,11 +24,11 @@ String readingJson() {
   int level = us ? max(0L, MOUNT_CM - us / 58) : -1;  // -1 = no echo
   ds.requestTemperatures();
   int rain = constrain(map(analogRead(PIN_RAIN), 4095, RAIN_WET_RAW, 0, 100), 0, 100);
-  char b[160];
+  char b[176];
   snprintf(b, sizeof b,
-    "{\"node\":\"%s\",\"boot\":%u,\"seq\":%u,\"level_cm\":%d,\"rain\":%d,\"temp_c\":%.1f,\"smoke\":%d,\"flame\":%d}",
+    "{\"node\":\"%s\",\"boot\":%u,\"seq\":%u,\"level_cm\":%d,\"rain\":%d,\"temp_c\":%.1f,\"smoke\":%d,\"flame\":%d,\"up\":%lu}",
     NODE_ID, bootId, ++seq, level, rain, ds.getTempCByIndex(0), HAVE_SMOKE ? analogRead(PIN_SMOKE) : -1,
-    digitalRead(PIN_FLAME) == LOW);
+    digitalRead(PIN_FLAME) == LOW, (unsigned long)millis());
   return b;
 }
 
@@ -54,6 +54,17 @@ void queue(const String &j) {
   f = LittleFS.open(BACKLOG, "w"); f.print(all); f.close();
 }
 
+// A queued line carries "up" (uptime when measured). On replay, tell the server how old it is so it keeps the measurement time.
+// Only valid within the same boot; lines from an earlier boot are sent as-is (server falls back to arrival time).
+String withAge(String l) {
+  int i = l.indexOf("\"up\":");
+  if (i < 0 || l.indexOf("\"boot\":" + String(bootId) + ",") < 0) return l;
+  long age = (long)millis() - l.substring(i + 5).toInt();
+  if (age < 0) return l;
+  l.remove(l.length() - 1);
+  return l + ",\"age_ms\":" + String(age) + "}";
+}
+
 void replay() {  // send queued lines in order; stop at first failure and keep the rest
   File f = LittleFS.open(BACKLOG, "r");
   if (!f) return;
@@ -62,7 +73,7 @@ void replay() {  // send queued lines in order; stop at first failure and keep t
   while (f.available()) {
     String l = f.readStringUntil('\n');
     if (!l.length()) continue;
-    if (ok && post(l)) continue;
+    if (ok && post(withAge(l))) continue;
     ok = false; rest += l + "\n";
   }
   f.close();

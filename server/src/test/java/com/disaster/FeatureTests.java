@@ -57,4 +57,34 @@ class FeatureTests {
         call("POST", "/api/logout", null, asha);
         assertEquals(401, call("POST", "/api/resources", "{\"id\":1,\"status\":\"available\"}", asha).statusCode(), "logged-out token is dead");
     }
+
+    @Test
+    void thresholdsAreConfigurableAndReplayKeepsMeasurementTime() throws Exception {
+        assertEquals(401, call("POST", "/api/thresholds", "{\"level_cm\":70}", null).statusCode(), "login required");
+        String admin = login("admin", "admin123");
+        assertEquals(400, call("POST", "/api/thresholds", "{\"bogus\":1}", admin).statusCode());
+        assertEquals(200, call("POST", "/api/thresholds", "{\"level_cm\":70}", admin).statusCode());
+        call("POST", "/api/readings", "{\"node\":\"t1\",\"boot\":1,\"seq\":1,\"level_cm\":60}", null);
+        assertEquals(0, alertsOf("t1").size(), "60 is below the new threshold of 70");
+        call("POST", "/api/thresholds", "{\"level_cm\":55}", admin);
+        call("POST", "/api/readings", "{\"node\":\"t1\",\"boot\":1,\"seq\":2,\"level_cm\":60}", null);
+        assertEquals("FLOOD", alertsOf("t1").get(0), "60 is above 55");
+        call("POST", "/api/thresholds", "{\"level_cm\":50}", admin);  // restore the default for other tests
+
+        // a reading replayed 10 minutes late is stored at its measurement time and does not become "latest"
+        call("POST", "/api/readings", "{\"node\":\"t2\",\"boot\":1,\"seq\":2,\"temp_c\":30.0}", null);
+        call("POST", "/api/readings", "{\"node\":\"t2\",\"boot\":1,\"seq\":1,\"temp_c\":11.0,\"age_ms\":600000}", null);
+        for (JsonNode n : json.readTree(call("GET", "/api/state", null, null).body()).get("nodes"))
+            if (n.get("node").asString().equals("t2")) assertEquals(30.0, n.get("data").get("temp_c").asDouble(), "newest reading wins");
+        JsonNode h = json.readTree(call("GET", "/api/history?node=t2&minutes=30", null, null).body());
+        assertEquals(2, h.size());
+        assertTrue(h.get(1).get("t").asDouble() - h.get(0).get("t").asDouble() > 590, "replayed point sits ~10 min earlier");
+    }
+
+    java.util.List<String> alertsOf(String node) throws Exception {
+        var out = new java.util.ArrayList<String>();
+        for (JsonNode n : json.readTree(call("GET", "/api/state", null, null).body()).get("nodes"))
+            if (n.get("node").asString().equals(node)) for (JsonNode a : n.get("alerts")) out.add(a.asString());
+        return out;
+    }
 }

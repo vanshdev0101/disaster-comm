@@ -54,7 +54,7 @@ public class Nodes {
         for (int i = 0; i < all.size(); i += step) {
             Reading r = all.get(i);
             Map<String, Object> m = new LinkedHashMap<>();
-            m.put("t", r.recv); m.put("level_cm", r.levelCm); m.put("rain", r.rain);
+            m.put("t", r.recv); m.put("seq", r.seq); m.put("level_cm", r.levelCm); m.put("rain", r.rain);
             m.put("temp_c", r.tempC); m.put("via", r.via);
             out.add(m);
         }

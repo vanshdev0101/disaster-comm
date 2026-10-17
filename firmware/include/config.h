@@ -27,4 +27,4 @@
 #define PIN_RAIN 32  // ADC1 pin, safe with Wi-Fi
 #define PIN_RAIN_VCC 13  // rain board powered from this pin (set HIGH): keeps D15 from carrying too much
 #define RAIN_WET_RAW 1000  // raw ADC when the plate is soaked; dry reads ~4095 (calibrate on site)
-#define MOUNT_CM 200  // sensor height above the dry bed; calibrate on site
+#define MOUNT_CM 70  // sensor height above the dry bed in cm: level = MOUNT_CM - measured distance; calibrate on site

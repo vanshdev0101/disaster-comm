@@ -16,7 +16,8 @@ interface ReadingRepo extends JpaRepository<Reading, Long> {
 
     List<Reading> findByNodeAndRecvGreaterThanOrderByRecv(String node, double recv);
 
-    @Query("select r from Reading r where r.id in (select max(x.id) from Reading x group by x.node) order by r.node")
+    @Query("select r from Reading r where r.id in (select max(x.id) from Reading x where x.recv = "
+            + "(select max(y.recv) from Reading y where y.node = x.node) group by x.node) order by r.node")
     List<Reading> latestPerNode();
 }
 
@@ -28,7 +29,8 @@ public class Api {
     record In(@NotBlank String node, Long boot, @NotNull Long seq,
               @JsonProperty("level_cm") Integer levelCm, Integer rain,
               @JsonProperty("temp_c") Double tempC, Integer smoke, Integer flame,
-              String via, Integer rssi) {}
+              String via, Integer rssi,
+              @JsonProperty("age_ms") Long ageMs) {}  // set by the node when replaying a queued reading
 
     record StatusIn(@NotNull Long id, @Pattern(regexp = "available|deployed|unavailable") String status) {}
 
@@ -37,15 +39,17 @@ public class Api {
     private final Officer officer;
     private final NodeRepo nodeInfo;
     private final Audit audit;
+    private final Thresholds thresholds;
 
     static final double OFFLINE_S = 60;  // node interval is ~10 s; a minute of silence = offline
 
-    Api(ReadingRepo readings, ResourceRepo resources, Officer officer, NodeRepo nodeInfo, Audit audit) {
+    Api(ReadingRepo readings, ResourceRepo resources, Officer officer, NodeRepo nodeInfo, Audit audit, Thresholds thresholds) {
         this.readings = readings;
         this.resources = resources;
         this.officer = officer;
         this.nodeInfo = nodeInfo;
         this.audit = audit;
+        this.thresholds = thresholds;
     }
 
     @Bean
@@ -61,17 +65,6 @@ public class Api {
         };
     }
 
-    // ponytail: fixed thresholds, per-site calibration/config when real sensors arrive
-    static List<String> alerts(Reading r) {
-        List<String> a = new ArrayList<>();
-        if (r.levelCm != null && r.levelCm >= 50) a.add("FLOOD");
-        if (r.flame != null && r.flame != 0) a.add("FIRE");
-        if (r.smoke != null && r.smoke >= 2000) a.add("SMOKE");
-        if (r.tempC != null && r.tempC >= 50) a.add("HEAT");
-        if (r.rain != null && r.rain >= 80) a.add("HEAVY_RAIN");
-        return a;
-    }
-
     /** Duplicates (same node/boot/seq, e.g. LoRa copy + later Wi-Fi replay) are ignored. */
     @PostMapping("/readings")
     public Map<String, Boolean> ingest(@Valid @RequestBody In in) {
@@ -79,7 +72,9 @@ public class Api {
         if (readings.existsByNodeAndBootAndSeq(in.node(), boot, in.seq())) return Map.of("stored", false);
         Reading r = new Reading();
         r.node = in.node(); r.boot = boot; r.seq = in.seq();
-        r.recv = System.currentTimeMillis() / 1000.0;
+        // a replayed reading is stamped with when it was measured, not when it finally arrived
+        double age = in.ageMs() == null ? 0 : Math.min(Math.max(in.ageMs(), 0), 86_400_000L) / 1000.0;
+        r.recv = System.currentTimeMillis() / 1000.0 - age;
         r.via = in.via() == null ? "wifi" : in.via();
         r.rssi = in.rssi(); r.levelCm = in.levelCm(); r.rain = in.rain();
         r.tempC = in.tempC(); r.smoke = in.smoke(); r.flame = in.flame();
@@ -100,14 +95,14 @@ public class Api {
             data.put("smoke", r.smoke); data.put("flame", r.flame);
             Map<String, Object> n = new LinkedHashMap<>();
             n.put("node", r.node); n.put("recv", r.recv); n.put("via", r.via); n.put("rssi", r.rssi);
-            n.put("data", data); n.put("alerts", alerts(r));
+            n.put("data", data); n.put("alerts", thresholds.alerts(r));
             NodeInfo ni = info.get(r.node);
             n.put("name", ni == null || ni.name == null ? r.node : ni.name);
             n.put("lat", ni == null ? null : ni.lat); n.put("lon", ni == null ? null : ni.lon);
             n.put("online", now - r.recv < OFFLINE_S);
             nodes.add(n);
         }
-        return Map.of("now", now, "nodes", nodes, "incidents", officer.active(),
+        return Map.of("now", now, "nodes", nodes, "incidents", officer.active(), "thresholds", thresholds.get(),
                 "resources", resources.findAll(org.springframework.data.domain.Sort.by("id")));
     }
 

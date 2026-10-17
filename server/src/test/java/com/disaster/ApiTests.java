@@ -12,7 +12,7 @@ class ApiTests {
     @Autowired Api api;
 
     Api.In in(String node, long boot, long seq, Integer level, Integer flame, String via, Integer rssi) {
-        return new Api.In(node, boot, seq, level, null, null, null, flame, via, rssi);
+        return new Api.In(node, boot, seq, level, null, null, null, flame, via, rssi, null);
     }
 
     @SuppressWarnings("unchecked")

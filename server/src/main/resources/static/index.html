@@ -128,7 +128,7 @@ dialog::backdrop{background:#05080bcc}dialog h3{margin:0 0 4px;font-size:15px}di
         <div class="ovl legend"><span><i style="background:var(--ok)"></i>Normal</span><span><i style="background:var(--crit);border-radius:2px"></i>Alert</span><span><i style="background:var(--warn)"></i>Stale data</span><span><i style="background:var(--off)"></i>Offline</span><span><i style="background:transparent;outline:2px solid var(--cyan);outline-offset:1px"></i>Selected</span></div>
         <div class="ovl coord" id="coord">—</div></div>
     </section>
-    <section class="panel"><div class="ph"><h2>Sensor network</h2><span class="sub" id="nodeN"></span></div><div class="tw" id="nodes"></div></section>
+    <section class="panel"><div class="ph"><h2>Sensor network</h2><span class="sub" id="nodeN"></span><span class="sp"></span><button data-act="th-open">Alert thresholds</button></div><div class="tw" id="nodes"></div></section>
     <section class="panel"><div class="ph"><h2>Instrument readings</h2><span class="sub" id="selName"></span><span class="sp"></span><span id="selBtns"></span></div><div id="charts"></div></section>
   </div>
   <aside class="right">
@@ -142,6 +142,12 @@ dialog::backdrop{background:#05080bcc}dialog h3{margin:0 0 4px;font-size:15px}di
   <label for="u">Username</label><input id="u" autocomplete="username" required>
   <label for="p">Password</label><input id="p" type="password" autocomplete="current-password" required>
   <div class="row"><button type="button" class="ghost" data-act="close-dlg">Cancel</button><button class="primary" value="ok">Sign in</button></div></form></dialog>
+<dialog id="thDlg"><form method="dialog" id="thForm"><h3>Alert thresholds</h3><p>An alert opens when a reading reaches its threshold. Changes apply immediately.</p>
+  <label for="th-level_cm">Water level (cm above dry bed)</label><input id="th-level_cm" type="number" min="0" step="any" required>
+  <label for="th-temp_c">Temperature (°C)</label><input id="th-temp_c" type="number" min="0" step="any" required>
+  <label for="th-rain">Rain (%)</label><input id="th-rain" type="number" min="0" max="100" step="any" required>
+  <label for="th-smoke">Smoke (raw sensor value)</label><input id="th-smoke" type="number" min="0" step="any" required>
+  <div class="row"><button type="button" class="ghost" data-act="close-dlg">Cancel</button><button class="primary" value="ok">Save</button></div></form></dialog>
 <dialog id="adminDlg"><form method="dialog" id="adminForm"><h3>Add officer</h3><p>Admins can create officer accounts.</p>
   <label for="nu">Username</label><input id="nu" minlength="3" required>
   <label for="np">Password (6+ characters)</label><input id="np" type="password" minlength="6" required>
@@ -170,8 +176,8 @@ const KIND={FIRE:['fire','Fire','crit'],FLOOD:['flood','Flood','crit'],SMOKE:['s
 const kind=t=>KIND[t]||['alert',t,'crit'];
 const SEVLABEL={crit:'Critical',warn:'Warning'},SEVRANK={crit:0,warn:1};
 const COL={crit:'var(--crit)',warn:'var(--warn)',ok:'var(--ok)',off:'var(--off)'};
-// mirrors Api.alerts() on the server
-const TH={level_cm:50,temp_c:50,rain:80};
+// thresholds are configurable on the server; render() refreshes this from /api/state
+let TH={level_cm:50,temp_c:50,rain:80,smoke:2000};
 const STALE_S=30;
 const tsec=s=>Math.max(0,Math.round(s));
 function rel(s){s=tsec(s);if(s<60)return s+' s';if(s<3600)return Math.floor(s/60)+' min';if(s<86400)return Math.floor(s/3600)+' h '+Math.floor(s%3600/60)+' min';return Math.floor(s/86400)+' d'}
@@ -254,10 +260,10 @@ function chart(c,rows,key,now,{thr,unit,skipNeg}){
   for(const p of pts)if(thr!=null&&p.v>=thr){x.fillStyle=crit;x.beginPath();x.arc(X(p.t),Y(p.v),2.4,0,7);x.fill()}
   const l=pts[pts.length-1];x.fillStyle=cyan;x.beginPath();x.arc(X(l.t),Y(l.v),3.2,0,7);x.fill();
 }
-const CHS=[['level_cm','Water level','cm',TH.level_cm,true],['temp_c','Temperature','°C',TH.temp_c,false],['rain','Rain','%',TH.rain,false]];
+const CHS=[['level_cm','Water level','cm',null,true],['temp_c','Temperature','°C',null,false],['rain','Rain','%',null,false]];
 function drawCharts(){
   if(!state||!sel)return;const rows=history[sel]||[];
-  for(const [k,,u,th,sk] of CHS){const c=$('ch-'+k);if(c)chart(c,rows,k,state.now,{thr:th,unit:u,skipNeg:sk})}
+  for(const [k,,u,th,sk] of CHS){const c=$('ch-'+k);if(c)chart(c,rows,k,state.now,{thr:TH[k],unit:u,skipNeg:sk})}
 }
 async function loadHistory(){if(!state)return;
   for(const n of state.nodes){try{history[n.node]=await (await fetch(`/api/history?node=${encodeURIComponent(n.node)}&minutes=30`)).json()}catch(e){}}drawCharts()}
@@ -305,6 +311,7 @@ function toggleLocate(){
 // ---------- render ----------
 function render(){
   const s=state;if(!s)return;
+  if(s.thresholds)TH=s.thresholds;
   if(!sel||!node(s,sel))sel=s.nodes.length?s.nodes[0].node:null;
   const online=s.nodes.filter(n=>n.online).length,avail=s.resources.filter(r=>r.status==='available').length,
     nc=s.incidents.filter(i=>kind(i.type)[2]==='crit').length,nw=s.incidents.length-nc,newest=s.nodes.length?Math.min(...s.nodes.map(n=>s.now-n.recv)):null;
@@ -337,7 +344,7 @@ function render(){
   $('selName').textContent=sn?(sn.name!==sn.node?`${sn.name} · ${sn.node}`:sn.name):'';
   $('selBtns').innerHTML=sn?`<button data-act="place" data-node="${esc(sn.node)}">${ic('pin')}${sn.lat==null?'Place on map':'Move on map'}</button> <button class="ghost" data-act="rename" data-node="${esc(sn.node)}" data-name="${esc(sn.name)}">Rename</button>`:'';
   if(sn){const d=sn.data;
-    $('charts').innerHTML=`<div class="charts">${CHS.map(([k,l,u,th,sk])=>{const val=d[k],bad=val==null||(sk&&val<0);
+    $('charts').innerHTML=`<div class="charts">${CHS.map(([k,l,u,_,sk])=>{const th=TH[k],val=d[k],bad=val==null||(sk&&val<0);
       return `<div class="chart"><div class="h"><b>${l}</b><span>${u}</span><span class="cur ${!bad&&val>=th?'over':''}" data-k="c:${k}" data-v="${val}">${bad?'<span class="na">n/a</span>':val}</span></div><canvas id="ch-${k}"></canvas></div>`}).join('')}</div>`;
   }else $('charts').innerHTML='<div class="empty">Select a node to see its instrument readings.</div>';
   if(!document.activeElement||document.activeElement.tagName!=='SELECT')
@@ -365,6 +372,7 @@ document.addEventListener('click',async e=>{
   if(a==='alerts')toggleAlerts();
   else if(a==='login-open')$('loginDlg').showModal();
   else if(a==='admin-open')$('adminDlg').showModal();
+  else if(a==='th-open'){if(!me){toast('Sign in to change thresholds','bad');$('loginDlg').showModal();return}for(const k of Object.keys(TH))$('th-'+k).value=TH[k];$('thDlg').showModal()}
   else if(a==='close-dlg')b.closest('dialog').close();
   else if(a==='logout')logout();
   else if(a==='cancel-place')stopPlace();
@@ -377,6 +385,9 @@ document.addEventListener('click',async e=>{
 });
 document.addEventListener('change',async e=>{const s=e.target.closest('[data-res]');if(s){await api('/api/resources','POST',{id:+s.dataset.res,status:s.value});tick()}});
 $('loginForm').addEventListener('submit',e=>{if(e.submitter&&e.submitter.value==='ok')doLogin()});
+$('thForm').addEventListener('submit',async e=>{if(!e.submitter||e.submitter.value!=='ok')return;
+  const b={};for(const k of Object.keys(TH))b[k]=+$('th-'+k).value;const r=await api('/api/thresholds','POST',b);
+  if(r){TH=r;toast('Thresholds updated','good');tick()}else toast('Could not save thresholds','bad')});
 $('adminForm').addEventListener('submit',async e=>{if(!e.submitter||e.submitter.value!=='ok')return;
   const r=await api('/api/officers','POST',{username:$('nu').value,password:$('np').value,role:$('nr').value});
   toast(r&&r.ok?'Officer added':'Could not add officer (name taken or password too short)',r&&r.ok?'good':'bad');$('nu').value=$('np').value=''});
