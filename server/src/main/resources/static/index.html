@@ -1,136 +1,147 @@
 <!doctype html>
 <html lang="en">
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
 <title>Disaster Control Station</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
 :root{
-  --bg:#0b1220;--surface:#111a2d;--surface-2:#16223a;--border:#223152;--text:#e7ecf6;--muted:#8d9bb5;
-  --accent:#4f8cff;--accent-ink:#06142e;--ok:#34d399;--warn:#fbbf24;--crit:#f87171;--off:#64748b;
-  --flood:#38bdf8;--fire:#f87171;--smoke:#a8b3c7;--heat:#fb923c;--rain:#818cf8;--shadow:0 1px 2px #0006,0 8px 24px #0004;
+  --bg:#101418;--s1:#171d23;--s2:#1d252d;--line:#303a44;--line-2:#242d36;--text:#e7edf2;--mute:#94a3b0;--dim:#66737f;
+  --crit:#ef4444;--warn:#f59e0b;--ok:#22c55e;--cyan:#38bdf8;--off:#66737f;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
-@media (prefers-color-scheme:light){:root{
-  --bg:#f3f5f9;--surface:#fff;--surface-2:#f6f8fc;--border:#dde3ee;--text:#0f1b33;--muted:#5d6b85;
-  --accent:#2563eb;--accent-ink:#fff;--ok:#059669;--warn:#b45309;--crit:#dc2626;--off:#94a3b8;
-  --flood:#0284c7;--fire:#dc2626;--smoke:#64748b;--heat:#ea580c;--rain:#4f46e5;--shadow:0 1px 2px #0f1b330f,0 8px 24px #0f1b3314;}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
-svg.i{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+html{color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--text);font:13px/1.4 var(--sans);-webkit-font-smoothing:antialiased}
+.num,.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+svg.i{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
 button,input,select{font:inherit;color:inherit}
-button{cursor:pointer;border:1px solid var(--border);background:var(--surface-2);border-radius:8px;padding:7px 12px;font-weight:500;display:inline-flex;align-items:center;gap:6px;transition:background .15s,border-color .15s}
-button:hover{border-color:var(--accent)}button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}button.primary:hover{filter:brightness(1.1)}
-button.ghost{background:transparent}button.sm{padding:5px 10px;font-size:13px}
-input,select{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;width:100%}
-label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:12px 0 4px}
+button{cursor:pointer;border:1px solid var(--line);background:var(--s2);border-radius:4px;padding:5px 10px;font-weight:500;font-size:12px;display:inline-flex;align-items:center;gap:6px;transition:background .12s,border-color .12s}
+button:hover{border-color:var(--mute);background:#232d37}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
+button.primary{background:var(--cyan);border-color:var(--cyan);color:#04202e;font-weight:600}button.primary:hover{background:#5cc9fb}
+button.danger{background:transparent;border-color:var(--crit);color:var(--crit)}button.danger:hover{background:#ef44441f}
+button.ghost{background:transparent}button:disabled{opacity:.45;cursor:default}
+input,select{background:#12171c;border:1px solid var(--line);border-radius:4px;padding:7px 9px;width:100%}
+label{display:block;font-size:11px;font-weight:600;color:var(--mute);margin:12px 0 4px;text-transform:uppercase;letter-spacing:.06em}
 
-/* app bar */
-header{position:sticky;top:0;z-index:1100;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
-.bar{max-width:1440px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:12px}
-.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:-.01em;flex:1;min-width:0}
-.logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),#7c5cff);display:grid;place-items:center;color:#fff}
-.brand small{display:block;font-weight:500;font-size:12px;color:var(--muted);letter-spacing:0}
-.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;border:1px solid transparent}
-.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
-.pill.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}.pill.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 14%,transparent)}
-.pill.crit{color:var(--crit);background:color-mix(in srgb,var(--crit) 14%,transparent)}.pill.off{color:var(--off);background:color-mix(in srgb,var(--off) 16%,transparent)}
-.pill.plain::before{display:none}.pill.link{color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}.pill.link::before{display:none}
-.avatar{width:28px;height:28px;border-radius:50%;background:var(--surface-2);border:1px solid var(--border);display:grid;place-items:center;font-size:12px;font-weight:700}
-.user{display:flex;align-items:center;gap:8px}.user .who{line-height:1.2}.user .who small{display:block;color:var(--muted);font-size:11px;text-transform:capitalize}
+/* ---- top bar ---- */
+.top{position:sticky;top:0;z-index:1100;background:var(--s1);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:18px;padding:0 16px;min-height:48px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:14px;letter-spacing:.01em;padding:8px 0}
+.brand .mark{width:26px;height:26px;border:1.5px solid var(--cyan);border-radius:4px;display:grid;place-items:center;color:var(--cyan)}
+.brand small{display:block;font-size:10.5px;font-weight:500;color:var(--mute);letter-spacing:.09em;text-transform:uppercase}
+.strip{display:flex;align-items:stretch;gap:0;margin-left:6px;flex-wrap:wrap}
+.stat{padding:6px 16px;border-left:1px solid var(--line);display:flex;flex-direction:column;justify-content:center;min-width:92px}
+.stat .k{font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--mute)}
+.stat .v{font-family:var(--mono);font-size:16px;font-weight:500;line-height:1.15}.stat .v small{font-size:11px;color:var(--mute)}
+.stat.crit .v{color:var(--crit)}.stat.warn .v{color:var(--warn)}.stat.ok .v{color:var(--ok)}
+.sp{flex:1}.clock{font-family:var(--mono);font-size:12px;color:var(--mute);text-align:right;line-height:1.25}.clock b{color:var(--text);font-weight:500}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:3px;border:1px solid currentColor;white-space:nowrap}
+.chip.crit{color:var(--crit);background:#ef44441c}.chip.warn{color:var(--warn);background:#f59e0b1a}.chip.ok{color:var(--ok);background:#22c55e17}
+.chip.off{color:var(--off);background:#66737f1f}.chip.info{color:var(--cyan);background:#38bdf814}.chip.solid{color:#fff;background:var(--crit);border-color:var(--crit)}
+.user{display:flex;align-items:center;gap:8px}.user .who{line-height:1.2;font-weight:600}.user .who small{display:block;font-weight:500;color:var(--mute);font-size:10.5px;text-transform:uppercase;letter-spacing:.07em}
 
-main{max-width:1440px;margin:0 auto;padding:20px 24px 56px}
-.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:20px}
-.kpi{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
-.kpi .l{font-size:12px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:6px}.kpi .v{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-top:2px}
-.kpi .v small{font-size:14px;font-weight:500;color:var(--muted)}.kpi.crit .v{color:var(--crit)}.kpi.ok .v{color:var(--ok)}
-.layout{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:20px;align-items:start}
-.col{display:flex;flex-direction:column;gap:20px;min-width:0}
-section{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
-section>h2{margin:0;padding:14px 18px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)}
-section>h2 .n{margin-left:auto;font-weight:500;color:var(--muted);font-size:12px}.body{padding:14px 18px}
-.empty{color:var(--muted);padding:22px;text-align:center}.empty b{display:block;color:var(--ok);font-size:15px;margin-bottom:2px}
+/* ---- layout ---- */
+.ops{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:12px;padding:12px;max-width:1800px;margin:0 auto}
+.left,.right{display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel{background:var(--s1);border:1px solid var(--line);border-radius:6px;overflow:hidden;min-width:0}
+.ph{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);background:var(--s2);min-height:38px}
+.ph h2{margin:0;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}.ph .sub{color:var(--mute);font-size:11.5px}.ph .sp{flex:1}
+.empty{padding:22px 14px;color:var(--mute);text-align:center}.empty b{display:block;color:var(--text);font-weight:600;margin-bottom:2px}
 
-/* incidents */
-.inc{display:flex;gap:14px;padding:14px 18px;border-bottom:1px solid var(--border);border-left:4px solid var(--c,var(--crit))}.inc:last-child{border-bottom:0}
-.inc .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;color:var(--c);background:color-mix(in srgb,var(--c) 15%,transparent);flex:none}
-.inc .t{font-weight:600}.inc .m{color:var(--muted);font-size:12.5px;margin-top:1px}.inc .acts{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px}
-.inc .info{flex:1;min-width:0}.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.chip{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:12px}
+/* ---- map ---- */
+#mapwrap{position:relative;height:clamp(440px,58vh,680px);background:#0d1217}#map{position:absolute;inset:0;background:#0d1217}
+#map .leaflet-tile-pane{filter:invert(1) hue-rotate(195deg) brightness(.7) contrast(.92) saturate(.3)}
+.leaflet-container{font-family:var(--sans)}.leaflet-bar a{background:var(--s2);color:var(--text);border-color:var(--line)}.leaflet-bar a:hover{background:#26313c}
+.leaflet-control-attribution{background:#101418cc!important;color:var(--mute)!important;font-size:10px}.leaflet-control-attribution a{color:var(--mute)!important}
+.leaflet-tooltip,.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--s1);color:var(--text);border:1px solid var(--line);box-shadow:none;border-radius:4px}
+.leaflet-popup-content{margin:10px 12px;font-size:12px}
+.ovl{position:absolute;z-index:800;background:#101418e6;border:1px solid var(--line);border-radius:4px}
+.legend{left:10px;bottom:28px;padding:8px 10px;display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--mute)}
+.legend span{display:flex;align-items:center;gap:8px}.legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.coord{right:10px;bottom:28px;padding:3px 8px;font-family:var(--mono);font-size:11px;color:var(--mute)}
+.mtools{right:10px;top:10px;display:flex;gap:6px;padding:4px}
+.mapmsg{left:50%;top:10px;transform:translateX(-50%);padding:7px 10px;display:none;align-items:center;gap:10px;font-size:12px;border-color:var(--cyan)}.mapmsg.show{display:flex}
+.nomap{position:absolute;inset:0;display:grid;place-items:center;color:var(--mute);text-align:center;padding:20px}
+.mk{position:relative;width:14px;height:14px}.mk i{position:absolute;inset:0;border-radius:50%;background:var(--c);border:2px solid #101418}
+.mk.alert i{border-radius:2px;box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 40%,transparent)}.mk.sel i{outline:2px solid var(--cyan);outline-offset:3px}
+.mk b{position:absolute;left:20px;top:-2px;font:500 11px var(--mono);background:#101418e6;border:1px solid var(--line);border-radius:3px;padding:0 5px;white-space:nowrap;color:var(--text)}
+.me{width:14px;height:14px;border-radius:50%;background:var(--cyan);border:2px solid #101418;box-shadow:0 0 0 2px var(--cyan)}
 
-/* nodes */
-.node{padding:16px 18px;border-bottom:1px solid var(--border)}.node:last-child{border-bottom:0}.node.off{opacity:.65}
-.node .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.node .nm{font-weight:700;font-size:15px}.node .ago{color:var(--muted);font-size:12.5px}
-.node .sp{flex:1}.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
-.tile{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:10px 12px;min-width:0}
-.tile .l{font-size:11.5px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:6px}.tile .v{font-size:22px;font-weight:700;letter-spacing:-.02em}.tile .v small{font-size:12px;color:var(--muted);font-weight:500}
-.tile canvas{width:100%;height:46px;display:block;margin-top:4px}.nflags{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;align-items:center}
+/* ---- tables ---- */
+table{width:100%;border-collapse:collapse}
+th{font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--mute);text-align:left;padding:7px 12px;border-bottom:1px solid var(--line);background:var(--s1);white-space:nowrap}
+td{padding:9px 12px;border-bottom:1px solid var(--line-2);white-space:nowrap}tr:last-child td{border-bottom:0}
+th.r,td.r{text-align:right}tbody tr[data-sel]{cursor:pointer}tbody tr[data-sel]:hover td{background:#1b232b}tbody tr.sel td{background:#38bdf812;box-shadow:inset 3px 0 0 var(--cyan)}
+tbody tr.sel td:not(:first-child){box-shadow:none}.nm{font-weight:600}.id{font:11px var(--mono);color:var(--mute)}
+.na{color:var(--dim);font-family:var(--mono)}.unit{color:var(--mute);font-size:11px;margin-left:2px}.over{color:var(--crit);font-weight:500}
+.tw{overflow-x:auto}
 
-/* map */
-#mapwrap{position:relative}#map{height:340px;background:var(--surface-2)}
-#map .leaflet-control-attribution{font-size:10px}
-@media (prefers-color-scheme:dark){#map .leaflet-tile-pane{filter:invert(1) hue-rotate(200deg) brightness(.88) contrast(.9) saturate(.55)}}
-.mapmsg{position:absolute;inset:auto 12px 12px 12px;z-index:900;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:12.5px;box-shadow:var(--shadow);display:none;align-items:center;gap:10px}
-.mapmsg.show{display:flex}.legend{display:flex;gap:14px;padding:10px 18px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
-.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
-.pin{position:relative;width:22px;height:22px}.pin span{position:absolute;inset:3px;border-radius:50%;background:var(--c);border:2.5px solid #fff;box-shadow:0 2px 6px #0007}
-.pin.alert::after{content:"";position:absolute;inset:0;border-radius:50%;background:var(--c);opacity:.5;animation:pulse 1.6s ease-out infinite}
-@keyframes pulse{to{transform:scale(2.4);opacity:0}}
-.me{width:18px;height:18px;border-radius:50%;background:var(--accent);border:3px solid #fff;box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 60%,transparent);animation:ring 2s infinite}
-@keyframes ring{to{box-shadow:0 0 0 16px transparent}}
-.leaflet-tooltip{background:var(--surface);color:var(--text);border:1px solid var(--border);box-shadow:var(--shadow);font:600 12px Inter,system-ui,sans-serif}
-.leaflet-tooltip-top:before{border-top-color:var(--border)}
-.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--surface);color:var(--text)}
+/* ---- charts ---- */
+.charts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0}
+.chart{padding:10px 12px;border-right:1px solid var(--line-2);min-width:0}.chart:last-child{border-right:0}
+.chart .h{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}.chart .h b{font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:600}.chart .h span{font-size:11px;color:var(--mute)}
+.chart .cur{margin-left:auto;font:500 15px var(--mono)}.chart canvas{width:100%;height:150px;display:block}
 
-/* resources / activity */
-.res{display:flex;align-items:center;gap:10px;padding:10px 18px;border-bottom:1px solid var(--border)}.res:last-child{border-bottom:0}
-.res b{flex:1;font-weight:600}.res select{width:auto;padding:5px 8px;font-size:13px}
-.log{padding:6px 18px 12px;max-height:300px;overflow:auto}.log div{display:flex;gap:10px;padding:8px 0;border-bottom:1px dashed var(--border);font-size:13px}.log div:last-child{border:0}
-.log time{color:var(--muted);flex:none;width:64px;font-size:12px}
+/* ---- incident queue ---- */
+.inc{display:grid;grid-template-columns:4px 1fr;border-bottom:1px solid var(--line-2);cursor:pointer}.inc:last-child{border-bottom:0}.inc:hover{background:#1b232b}.inc.sel{background:#38bdf812}
+.inc .bar{background:var(--c)}.inc .b{padding:10px 12px 11px;min-width:0}
+.inc .l1{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.inc .t{font-weight:600;font-size:14px;display:flex;align-items:center;gap:6px;color:var(--text)}.inc .t svg{color:var(--c)}
+.inc .l2{margin-top:3px;color:var(--mute);font-size:12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}.inc .l2 .mono{color:var(--text)}
+.inc .obs{margin-top:6px;font:12px var(--mono);color:var(--mute)}.inc .obs b{color:var(--text);font-weight:500}
+.inc .acts{margin-top:9px;display:flex;flex-wrap:wrap;gap:6px}.inc .asg{margin-top:6px;font-size:12px;color:var(--mute)}.inc .asg b{color:var(--ok);font-weight:600}
+.res td:last-child{text-align:right}.res select{width:auto;padding:3px 6px;font-size:12px}
+.log{max-height:240px;overflow:auto}.log div{display:grid;grid-template-columns:64px 1fr;gap:8px;padding:7px 12px;border-bottom:1px solid var(--line-2);font-size:12px}.log div:last-child{border:0}.log time{font:11px var(--mono);color:var(--mute)}
 
-/* toasts + dialogs */
-#toasts{position:fixed;right:16px;top:70px;z-index:3000;display:flex;flex-direction:column;gap:8px;width:min(360px,calc(100vw - 32px))}
-.toast{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow);font-weight:500;animation:slide .25s ease-out;cursor:pointer}
-.toast.bad{border-left-color:var(--crit)}.toast.bad svg{color:var(--crit)}.toast.good{border-left-color:var(--ok)}@keyframes slide{from{transform:translateX(24px);opacity:0}}
-dialog{border:1px solid var(--border);border-radius:16px;background:var(--surface);color:var(--text);padding:22px;width:min(380px,calc(100vw - 32px));box-shadow:var(--shadow)}
-dialog::backdrop{background:#020617aa}dialog h3{margin:0 0 4px;font-size:17px}dialog p{margin:0;color:var(--muted);font-size:13px}.row{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+/* ---- toasts / dialogs ---- */
+#toasts{position:fixed;right:14px;top:62px;z-index:3000;display:flex;flex-direction:column;gap:8px;width:min(380px,calc(100vw - 28px))}
+.toast{display:flex;gap:10px;align-items:flex-start;background:var(--s1);border:1px solid var(--line);border-left:4px solid var(--cyan);border-radius:4px;padding:10px 12px;font-weight:500;cursor:pointer}
+.toast.bad{border-left-color:var(--crit)}.toast.bad svg{color:var(--crit)}.toast.good{border-left-color:var(--ok)}.toast.good svg{color:var(--ok)}
+dialog{border:1px solid var(--line);border-radius:6px;background:var(--s1);color:var(--text);padding:20px;width:min(360px,calc(100vw - 28px))}
+dialog::backdrop{background:#05080bcc}dialog h3{margin:0 0 4px;font-size:15px}dialog p{margin:0;color:var(--mute);font-size:12.5px}.row{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
 
-@media (max-width:1100px){.layout{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:640px){.bar,main{padding-left:14px;padding-right:14px}.bar{flex-wrap:wrap;row-gap:8px}.brand{flex:1 1 100%}.brand div:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.brand small,.user .who{display:none}#auth{margin-left:auto}.tiles{grid-template-columns:1fr}#map{height:280px}#toasts{top:104px}}
+@media (max-width:1180px){.ops{grid-template-columns:1fr}.right{order:-1}#mapwrap{height:420px}}
+@media (max-width:760px){.top{gap:8px;padding:6px 10px}.clock{display:none}.strip{width:100%;margin:0;order:5}.stat{flex:1;min-width:70px;padding:4px 10px}.stat:first-child{border-left:0}.sp{display:none}.charts{grid-template-columns:1fr}.chart{border-right:0;border-bottom:1px solid var(--line-2)}.brand small,.user .who{display:none}.ops{padding:8px}#mapwrap{height:360px}#toasts{top:96px}}
 </style>
 
-<header><div class="bar">
-  <div class="brand"><div class="logo" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4M12 16h.01"/></svg></div>
-    <div>Disaster Control Station<small>Monitoring, dispatch &amp; response</small></div></div>
-  <span id="conn" class="pill warn">Connecting</span>
+<header class="top">
+  <div class="brand"><div class="mark" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5M19.1 4.9C23 8.8 23 15.2 19.1 19.1"/><circle cx="12" cy="12" r="2"/></svg></div>
+    <div>Disaster Control Station<small>Hazard monitoring &amp; response</small></div></div>
+  <div class="strip" id="strip"></div>
+  <span class="sp"></span>
+  <span id="conn" class="chip warn">Connecting</span>
+  <div class="clock" id="clock"></div>
   <button id="alertBtn" data-act="alerts" aria-pressed="false"></button>
   <div id="auth"></div>
-</div></header>
+</header>
 <div id="toasts" aria-live="polite"></div>
 
-<main>
-  <div class="kpis" id="kpis"></div>
-  <div class="layout">
-    <div class="col">
-      <section><h2>Incidents <span class="n" id="incN"></span></h2><div id="inc"></div></section>
-      <section><h2>Field nodes <span class="n" id="nodeN"></span></h2><div id="nodes"></div></section>
-    </div>
-    <div class="col side">
-      <section><h2>Field map <button class="sm" id="locBtn" data-act="locate" style="margin-left:auto"></button></h2>
-        <div id="mapwrap"><div id="map"></div><div class="mapmsg" id="mapmsg"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"/></svg><span id="mapmsgText" style="flex:1"></span><button class="sm" data-act="cancel-place">Cancel</button></div></div>
-        <div class="legend"><span><i style="background:var(--ok)"></i>Normal</span><span><i style="background:var(--crit)"></i>Alert</span><span><i style="background:var(--off)"></i>Offline</span></div></section>
-      <section><h2>Resources <span class="n" id="resN"></span></h2><div id="res"></div></section>
-      <section><h2>Activity</h2><div class="log" id="log"></div></section>
-    </div>
+<main class="ops">
+  <div class="left">
+    <section class="panel">
+      <div class="ph"><h2>Field map</h2><span class="sub">Live node positions</span><span class="sp"></span></div>
+      <div id="mapwrap"><div id="map"></div>
+        <div class="ovl mtools"><button class="sm" id="locBtn" data-act="locate"></button></div>
+        <div class="ovl mapmsg" id="mapmsg"><span id="mapmsgText"></span><button data-act="cancel-place">Cancel</button></div>
+        <div class="ovl legend"><span><i style="background:var(--ok)"></i>Normal</span><span><i style="background:var(--crit);border-radius:2px"></i>Alert</span><span><i style="background:var(--warn)"></i>Stale data</span><span><i style="background:var(--off)"></i>Offline</span><span><i style="background:transparent;outline:2px solid var(--cyan);outline-offset:1px"></i>Selected</span></div>
+        <div class="ovl coord" id="coord">—</div></div>
+    </section>
+    <section class="panel"><div class="ph"><h2>Sensor network</h2><span class="sub" id="nodeN"></span></div><div class="tw" id="nodes"></div></section>
+    <section class="panel"><div class="ph"><h2>Instrument readings</h2><span class="sub" id="selName"></span><span class="sp"></span><span id="selBtns"></span></div><div id="charts"></div></section>
   </div>
+  <aside class="right">
+    <section class="panel"><div class="ph"><h2>Incident queue</h2><span class="sub" id="incN"></span></div><div id="inc"></div></section>
+    <section class="panel"><div class="ph"><h2>Response resources</h2><span class="sub" id="resN"></span></div><div id="res"></div></section>
+    <section class="panel"><div class="ph"><h2>Operator activity</h2></div><div class="log" id="log"></div></section>
+  </aside>
 </main>
 
-<dialog id="loginDlg"><form method="dialog" id="loginForm"><h3>Officer sign in</h3><p>Sign in to acknowledge incidents and dispatch resources.</p>
+<dialog id="loginDlg"><form method="dialog" id="loginForm"><h3>Officer sign in</h3><p>Required to acknowledge incidents, dispatch resources and edit nodes.</p>
   <label for="u">Username</label><input id="u" autocomplete="username" required>
   <label for="p">Password</label><input id="p" type="password" autocomplete="current-password" required>
   <div class="row"><button type="button" class="ghost" data-act="close-dlg">Cancel</button><button class="primary" value="ok">Sign in</button></div></form></dialog>
-<dialog id="adminDlg"><form method="dialog" id="adminForm"><h3>Add officer</h3><p>Admins can create new officer accounts.</p>
+<dialog id="adminDlg"><form method="dialog" id="adminForm"><h3>Add officer</h3><p>Admins can create officer accounts.</p>
   <label for="nu">Username</label><input id="nu" minlength="3" required>
   <label for="np">Password (6+ characters)</label><input id="np" type="password" minlength="6" required>
   <label for="nr">Role</label><select id="nr"><option>officer</option><option>admin</option></select>
@@ -142,31 +153,37 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ICON={
   flood:'<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>',
-  fire:'<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+  fire:'<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
   smoke:'<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
   heat:'<path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/>',
   rain:'<path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="M16 14v6M8 14v6M12 16v6"/>',
-  node:'<path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5M19.1 4.9C23 8.8 23 15.2 19.1 19.1"/><circle cx="12" cy="12" r="2"/>',
   bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   bellOff:'<path d="M8.7 3A6 6 0 0 1 18 8c0 2.7.5 4.5 1.1 5.7M17 17H3s3-2 3-9c0-.9.2-1.7.5-2.5M10.3 21a1.94 1.94 0 0 0 3.4 0M2 2l20 20"/>',
   user:'<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
   alert:'<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01"/>',
   locate:'<path d="M2 12h3M19 12h3M12 2v3M12 19v3"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/>',
-  check:'<path d="M20 6 9 17l-5-5"/>',box:'<path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/>',
-  wave:'<path d="M2 12c2.5-3 4.5-3 7 0s4.5 3 7 0 4.5-3 6 0M2 18c2.5-3 4.5-3 7 0s4.5 3 7 0 4.5-3 6 0M2 6c2.5-3 4.5-3 7 0s4.5 3 7 0 4.5-3 6 0"/>'};
-const ic=(n,cls='')=>`<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICON[n]}</svg>`;
-const KIND={FLOOD:['flood','Flood','--flood'],FIRE:['fire','Fire','--fire'],SMOKE:['smoke','Smoke','--smoke'],HEAT:['heat','High heat','--heat'],HEAVY_RAIN:['rain','Heavy rain','--rain']};
-const kind=t=>KIND[t]||['alert',t,'--crit'];
-function ago(s){s=Math.max(0,Math.round(s));if(s<60)return s+'s ago';if(s<3600)return Math.floor(s/60)+' min ago';if(s<86400)return Math.floor(s/3600)+' h '+Math.floor(s%3600/60)+' m ago';return Math.floor(s/86400)+' d ago'}
-let me=null,token=null,state=null,alertsOn=false,seenInc=null,wasOnline={},history={},placing=null,map=null,markers={},actx=null;
+  check:'<path d="M20 6 9 17l-5-5"/>',pin:'<path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"/><circle cx="12" cy="10" r="3"/>'};
+const ic=(n,c='')=>`<svg class="i ${c}" viewBox="0 0 24 24" aria-hidden="true">${ICON[n]}</svg>`;
+// severity is fixed per hazard type; shown with a text label as well as colour
+const KIND={FIRE:['fire','Fire','crit'],FLOOD:['flood','Flood','crit'],SMOKE:['smoke','Smoke','warn'],HEAT:['heat','High temperature','warn'],HEAVY_RAIN:['rain','Heavy rain','warn']};
+const kind=t=>KIND[t]||['alert',t,'crit'];
+const SEVLABEL={crit:'Critical',warn:'Warning'},SEVRANK={crit:0,warn:1};
+const COL={crit:'var(--crit)',warn:'var(--warn)',ok:'var(--ok)',off:'var(--off)'};
+// mirrors Api.alerts() on the server
+const TH={level_cm:50,temp_c:50,rain:80};
+const STALE_S=30;
+const tsec=s=>Math.max(0,Math.round(s));
+function rel(s){s=tsec(s);if(s<60)return s+' s';if(s<3600)return Math.floor(s/60)+' min';if(s<86400)return Math.floor(s/3600)+' h '+Math.floor(s%3600/60)+' min';return Math.floor(s/86400)+' d'}
+const hms=t=>new Date(t*1000).toLocaleTimeString([], {hour12:false});
+const dtm=t=>{const d=new Date(t*1000),n=new Date();return (d.toDateString()===n.toDateString()?'':d.toLocaleDateString([], {day:'2-digit',month:'short'})+' ')+hms(t)};
+let me=null,token=null,state=null,alertsOn=false,seenInc=null,wasOnline={},history={},placing=null,map=null,markers={},actx=null,sel=null,selInc=null,lastOk=0;
 try{const s=JSON.parse(sessionStorage.getItem('me')||'null');if(s){me=s;token=s.token}}catch(e){}
 try{alertsOn=localStorage.getItem('alerts')==='1'}catch(e){}
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
 // ---------- auth ----------
 function authUI(){
-  $('auth').innerHTML=me?`<div class="user"><div class="avatar">${esc(me.username.slice(0,2).toUpperCase())}</div><div class="who">${esc(me.username)}<small>${esc(me.role)}</small></div>
-    ${me.role==='admin'?'<button class="sm" data-act="admin-open">Add officer</button>':''}<button class="sm ghost" data-act="logout">Sign out</button></div>`
+  $('auth').innerHTML=me?`<div class="user"><div class="who">${esc(me.username)}<small>${esc(me.role)}</small></div>${me.role==='admin'?'<button data-act="admin-open">Add officer</button>':''}<button class="ghost" data-act="logout">Sign out</button></div>`
     :`<button class="primary" data-act="login-open">${ic('user')}Officer sign in</button>`;
   $('alertBtn').innerHTML=ic(alertsOn?'bell':'bellOff')+(alertsOn?'Alerts on':'Alerts off');$('alertBtn').setAttribute('aria-pressed',alertsOn);
 }
@@ -197,11 +214,12 @@ function toast(msg,type='',sound=false){
   setTimeout(()=>d.remove(),type==='bad'?20000:6000);
   if(sound&&alertsOn){beep();try{if(Notification.permission==='granted')new Notification('Disaster Control Station',{body:msg})}catch(e){}}
 }
-const nodeName=(s,id)=>(s.nodes.find(n=>n.node===id)||{}).name||id;
+const node=(s,id)=>s.nodes.find(n=>n.node===id);
+const nodeName=(s,id)=>(node(s,id)||{}).name||id;
 function detectNew(s){
   const ids=new Set(s.incidents.map(i=>i.id));
   if(seenInc===null)seenInc=ids;else{
-    for(const i of s.incidents)if(!seenInc.has(i.id))toast(`New ${kind(i.type)[1].toLowerCase()} incident at ${nodeName(s,i.node)}`,'bad',true);
+    for(const i of s.incidents)if(!seenInc.has(i.id))toast(`${SEVLABEL[kind(i.type)[2]].toUpperCase()}: ${kind(i.type)[1]} at ${nodeName(s,i.node)}`,'bad',true);
     seenInc=new Set([...seenInc,...ids])}
   for(const n of s.nodes){
     if(n.node in wasOnline){
@@ -209,45 +227,64 @@ function detectNew(s){
       if(!wasOnline[n.node]&&n.online)toast(`${n.name} is back online`,'good')}
     wasOnline[n.node]=n.online}
 }
+// one place decides a node's state, so the table, map and charts always agree
+function nstate(s,n){const age=s.now-n.recv;return !n.online?'off':n.alerts.length?'alert':age>STALE_S?'stale':'ok'}
+const NS={off:['Offline','off','var(--off)'],alert:['Alert','crit','var(--crit)'],stale:['Stale','warn','var(--warn)'],ok:['Normal','ok','var(--ok)']};
 
-// ---------- charts ----------
-function chart(c,vals,color,skipNeg){
-  const dpr=devicePixelRatio||1,w=c.clientWidth,h=c.clientHeight;if(!w)return;c.width=w*dpr;c.height=h*dpr;
+// ---------- instrument charts ----------
+function chart(c,rows,key,now,{thr,unit,skipNeg}){
+  const dpr=devicePixelRatio||1,W=c.clientWidth,H=c.clientHeight;if(!W)return;c.width=W*dpr;c.height=H*dpr;
   const x=c.getContext('2d');x.scale(dpr,dpr);
-  const v=vals.map(a=>a==null||(skipNeg&&a<0)?null:a),good=v.filter(a=>a!=null);
-  if(good.length<2){x.fillStyle=css('--muted');x.font='12px Inter,sans-serif';x.fillText('Collecting data…',0,h/2+4);return}
-  const lo=Math.min(...good),hi=Math.max(...good),span=hi-lo||1,pad=4,X=i=>i/(v.length-1)*(w-2*pad)+pad,Y=a=>h-pad-(a-lo)/span*(h-2*pad);
-  x.strokeStyle=css('--border');x.lineWidth=1;x.beginPath();x.moveTo(0,h-.5);x.lineTo(w,h-.5);x.stroke();
-  const g=x.createLinearGradient(0,0,0,h);g.addColorStop(0,color+'55');g.addColorStop(1,color+'00');
-  x.lineWidth=2;x.lineJoin='round';x.strokeStyle=color;let first=null,last=null;
-  x.beginPath();v.forEach((a,i)=>{if(a==null){return}if(first==null){first=i;x.moveTo(X(i),Y(a))}else x.lineTo(X(i),Y(a));last=i});x.stroke();
-  x.lineTo(X(last),h);x.lineTo(X(first),h);x.closePath();x.fillStyle=g;x.fill();
-  x.beginPath();x.fillStyle=color;x.arc(X(last),Y(v[last]),3.5,0,7);x.fill();
+  const L=40,R=8,T=8,B=20,w=W-L-R,h=H-T-B,t1=now,t0=now-30*60;
+  const pts=rows.map(r=>({t:r.t,v:r[key]})).filter(p=>p.v!=null&&!(skipNeg&&p.v<0)&&p.t>=t0);
+  const mute=css('--mute'),line=css('--line'),cyan=css('--cyan'),crit=css('--crit'),warn=css('--warn');
+  x.font='10.5px "IBM Plex Mono",monospace';x.textBaseline='middle';
+  let lo=pts.length?Math.min(...pts.map(p=>p.v)):0,hi=pts.length?Math.max(...pts.map(p=>p.v)):1;
+  if(thr!=null){lo=Math.min(lo,thr);hi=Math.max(hi,thr)}
+  if(hi-lo<1){hi+=.5;lo-=.5}const pad=(hi-lo)*.1;lo-=pad;hi+=pad;if(key==='rain')lo=Math.max(lo,0);
+  const X=t=>L+(t-t0)/(t1-t0)*w,Y=v=>T+h-(v-lo)/(hi-lo)*h;
+  x.strokeStyle=line;x.lineWidth=1;x.fillStyle=mute;x.textAlign='right';
+  for(let i=0;i<=3;i++){const v=lo+(hi-lo)*i/3,y=Y(v);x.globalAlpha=i?.55:1;x.beginPath();x.moveTo(L,Math.round(y)+.5);x.lineTo(W-R,Math.round(y)+.5);x.stroke();x.globalAlpha=1;x.fillText(Math.abs(v)>=100?v.toFixed(0):v.toFixed(1),L-6,y)}
+  x.textAlign='center';[[0,'−30 min'],[.5,'−15'],[1,'now']].forEach(([f,l])=>{x.fillText(l,L+f*w+(f===0?14:f===1?-8:0),H-8)});
+  if(thr!=null){const y=Y(thr);x.strokeStyle=warn;x.setLineDash([5,4]);x.lineWidth=1;x.beginPath();x.moveTo(L,y);x.lineTo(W-R,y);x.stroke();x.setLineDash([]);x.fillStyle=warn;x.textAlign='left';x.fillText(`threshold ${thr}`,L+4,y-7)}
+  if(pts.length<2){x.fillStyle=mute;x.textAlign='center';x.fillText(pts.length?'Not enough data yet':'No data in the last 30 minutes',L+w/2,T+h/2);return}
+  x.strokeStyle=cyan;x.lineWidth=1.5;x.lineJoin='round';x.beginPath();
+  pts.forEach((p,i)=>{const gap=i&&p.t-pts[i-1].t>45;(i===0||gap)?x.moveTo(X(p.t),Y(p.v)):x.lineTo(X(p.t),Y(p.v))});x.stroke();  // gaps in reporting stay visible as breaks
+  for(const p of pts)if(thr!=null&&p.v>=thr){x.fillStyle=crit;x.beginPath();x.arc(X(p.t),Y(p.v),2.4,0,7);x.fill()}
+  const l=pts[pts.length-1];x.fillStyle=cyan;x.beginPath();x.arc(X(l.t),Y(l.v),3.2,0,7);x.fill();
 }
-const CH=[['level_cm','--flood'],['temp_c','--heat'],['rain','--rain']];
-function drawCharts(){for(const n of state?state.nodes:[]){const h=history[n.node]||[];
-  for(const [k,col] of CH){const c=document.getElementById(`ch-${n.node}-${k}`);if(c)chart(c,h.map(r=>r[k]),css(col),k==='level_cm')}}}
+const CHS=[['level_cm','Water level','cm',TH.level_cm,true],['temp_c','Temperature','°C',TH.temp_c,false],['rain','Rain','%',TH.rain,false]];
+function drawCharts(){
+  if(!state||!sel)return;const rows=history[sel]||[];
+  for(const [k,,u,th,sk] of CHS){const c=$('ch-'+k);if(c)chart(c,rows,k,state.now,{thr:th,unit:u,skipNeg:sk})}
+}
 async function loadHistory(){if(!state)return;
   for(const n of state.nodes){try{history[n.node]=await (await fetch(`/api/history?node=${encodeURIComponent(n.node)}&minutes=30`)).json()}catch(e){}}drawCharts()}
 
 // ---------- map ----------
-function pinIcon(col,alert){return L.divIcon({className:'',iconSize:[22,22],iconAnchor:[11,11],html:`<div class="pin ${alert?'alert':''}" style="--c:${col}"><span></span></div>`})}
+function mkIcon(col,alert,selected,label){return L.divIcon({className:'',iconSize:[14,14],iconAnchor:[7,7],html:`<div class="mk ${alert?'alert':''} ${selected?'sel':''}" style="--c:${col}"><i></i><b>${esc(label)}</b></div>`})}
 function drawMap(){
-  if(typeof L==='undefined'||!state)return;
+  if(!state)return;
+  if(typeof L==='undefined'){if(!$('map').dataset.nomap){$('map').dataset.nomap=1;$('map').innerHTML='<div class="nomap"><div><b>Map unavailable</b><br>It needs an Internet connection for map tiles. Node status continues in the panels.</div></div>'}return}
   if(!map){map=L.map('map',{zoomControl:true,attributionControl:true}).setView([13.0827,80.2707],11);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
-    map.on('click',async e=>{if(!placing)return;await api('/api/nodes','POST',{node:placing,lat:e.latlng.lat,lon:e.latlng.lng});stopPlace();tick()})}
+    map.on('click',async e=>{if(!placing)return;await api('/api/nodes','POST',{node:placing,lat:e.latlng.lat,lon:e.latlng.lng});stopPlace();tick()});
+    map.on('mousemove',e=>{$('coord').textContent=`${Math.abs(e.latlng.lat).toFixed(5)}°${e.latlng.lat>=0?'N':'S'}  ${Math.abs(e.latlng.lng).toFixed(5)}°${e.latlng.lng>=0?'E':'W'}`})}
   const pts=[];
   for(const n of state.nodes){
     if(n.lat==null)continue;pts.push([n.lat,n.lon]);
-    const col=css(!n.online?'--off':n.alerts.length?'--crit':'--ok'),pop=`<b>${esc(n.name)}</b><br>${n.online?'Online':'Offline'} · ${esc(n.via)}<br>${n.alerts.map(a=>kind(a)[1]).join(', ')||'Normal'}`;
-    if(markers[n.node]){markers[n.node].setLatLng([n.lat,n.lon]).setIcon(pinIcon(col,n.alerts.length&&n.online)).setPopupContent(pop).setTooltipContent(esc(n.name))}
-    else markers[n.node]=L.marker([n.lat,n.lon],{icon:pinIcon(col,n.alerts.length&&n.online)}).addTo(map).bindPopup(pop).bindTooltip(esc(n.name),{direction:'top',offset:[0,-12]})}
-  if(pts.length&&!drawMap.fit){map.fitBounds(pts,{maxZoom:15,padding:[50,50]});drawMap.fit=true}
+    const st=nstate(state,n),col=NS[st][2],ic2=mkIcon(col,st==='alert',n.node===sel,n.name),
+      pop=`<b>${esc(n.name)}</b> <span class="id">${esc(n.node)}</span><br>${NS[st][0]} · ${esc(n.via).toUpperCase()}<br>${n.alerts.map(a=>kind(a)[1]).join(', ')||'Within thresholds'}`;
+    if(markers[n.node]){markers[n.node].setLatLng([n.lat,n.lon]).setIcon(ic2).setPopupContent(pop)}
+    else{markers[n.node]=L.marker([n.lat,n.lon],{icon:ic2}).addTo(map).bindPopup(pop);markers[n.node].on('click',()=>select(n.node,false))}}
+  if(pts.length&&!drawMap.fit){map.fitBounds(pts,{maxZoom:15,padding:[60,60]});drawMap.fit=true}
   map.invalidateSize();
 }
+function select(id,fly=true){sel=id;render();if(fly&&map){const n=node(state,id);if(n&&n.lat!=null)map.flyTo([n.lat,n.lon],Math.max(map.getZoom(),14),{duration:.6})}}
+function startPlace(id){if(!me){toast('Sign in to place nodes','bad');$('loginDlg').showModal();return}placing=id;$('mapmsgText').textContent=`Click the map to place ${nodeName(state,id)}`;$('mapmsg').classList.add('show');$('map').style.cursor='crosshair'}
+function stopPlace(){placing=null;$('mapmsg').classList.remove('show');$('map').style.cursor=''}
 let meMarker=null,meCircle=null,watchId=null;
-function setLocBtn(){const b=$('locBtn');b.classList.toggle('primary',watchId!=null);b.innerHTML=ic('locate')+(watchId!=null?'Stop':'My location')}
+function setLocBtn(){const b=$('locBtn');b.classList.toggle('primary',watchId!=null);b.innerHTML=ic('locate')+(watchId!=null?'Stop locating':'My location')}
 function toggleLocate(){
   if(watchId!=null){navigator.geolocation.clearWatch(watchId);watchId=null;if(meMarker){map.removeLayer(meMarker);map.removeLayer(meCircle);meMarker=meCircle=null}setLocBtn();return}
   if(!navigator.geolocation||!isSecureContext){toast('Location needs https or localhost: open the dashboard at http://localhost:8000','bad');return}
@@ -255,58 +292,71 @@ function toggleLocate(){
   let first=true;
   watchId=navigator.geolocation.watchPosition(p=>{
     const ll=[p.coords.latitude,p.coords.longitude];
-    if(!meMarker){
-      meMarker=L.marker(ll,{icon:L.divIcon({className:'',iconSize:[18,18],iconAnchor:[9,9],html:'<div class="me"></div>'}),zIndexOffset:1000}).addTo(map).bindTooltip('You are here',{direction:'top',offset:[0,-10]});
-      meCircle=L.circle(ll,{radius:p.coords.accuracy,color:css('--accent'),weight:1,fillOpacity:.1}).addTo(map)}
-    else{meMarker.setLatLng(ll);meCircle.setLatLng(ll).setRadius(p.coords.accuracy)}
+    if(!meMarker){meMarker=L.marker(ll,{icon:L.divIcon({className:'',iconSize:[14,14],iconAnchor:[7,7],html:'<div class="me"></div>'}),zIndexOffset:1000}).addTo(map).bindTooltip(`You are here (±${Math.round(p.coords.accuracy)} m)`,{direction:'top',offset:[0,-8]});
+      meCircle=L.circle(ll,{radius:p.coords.accuracy,color:css('--cyan'),weight:1,fillOpacity:.08}).addTo(map)}
+    else{meMarker.setLatLng(ll).setTooltipContent(`You are here (±${Math.round(p.coords.accuracy)} m)`);meCircle.setLatLng(ll).setRadius(p.coords.accuracy)}
     if(first){map.setView(ll,Math.max(map.getZoom(),15));first=false}},
     err=>{toast(err.code===1?'Location permission denied':'Could not get your location','bad');watchId=null;setLocBtn()},
     {enableHighAccuracy:true,maximumAge:5000,timeout:15000});
   setLocBtn();
 }
-function startPlace(id){if(!me){toast('Sign in to place nodes','bad');$('loginDlg').showModal();return}placing=id;$('mapmsgText').textContent=`Click the map to place ${nodeName(state,id)}`;$('mapmsg').classList.add('show');$('map').style.cursor='crosshair';$('map').scrollIntoView({behavior:'smooth',block:'center'})}
-function stopPlace(){placing=null;$('mapmsg').classList.remove('show');$('map').style.cursor=''}
 
 // ---------- render ----------
-async function tick(){
-  let s;try{s=await (await fetch('/api/state')).json();$('conn').className='pill ok';$('conn').textContent='Live'}catch(e){$('conn').className='pill crit';$('conn').textContent='Server unreachable';return}
-  state=s;detectNew(s);
-  const online=s.nodes.filter(n=>n.online).length,avail=s.resources.filter(r=>r.status==='available').length,newest=s.nodes.length?Math.min(...s.nodes.map(n=>s.now-n.recv)):null;
-  $('kpis').innerHTML=`<div class="kpi ${s.incidents.length?'crit':'ok'}"><div class="l">${ic('alert')}Active incidents</div><div class="v">${s.incidents.length}</div></div>
-    <div class="kpi"><div class="l">${ic('node')}Nodes online</div><div class="v">${online}<small> / ${s.nodes.length}</small></div></div>
-    <div class="kpi"><div class="l">${ic('box')}Resources available</div><div class="v">${avail}<small> / ${s.resources.length}</small></div></div>
-    <div class="kpi"><div class="l">${ic('wave')}Last reading</div><div class="v">${newest==null?'—':ago(newest).replace(' ago','')}<small>${newest==null?'':' ago'}</small></div></div>`;
-  $('incN').textContent=s.incidents.length?s.incidents.length+' active':'';$('nodeN').textContent=`${online}/${s.nodes.length} online`;$('resN').textContent=`${avail}/${s.resources.length} available`;
-  $('inc').innerHTML=s.incidents.map(i=>{const [k,label,c]=kind(i.type),open=i.status==='open';
-    return `<div class="inc" style="--c:var(${c})"><div class="ic">${ic(k)}</div><div class="info">
-      <div class="t">${label} <span class="pill plain ${open?'crit':'warn'}" style="margin-left:6px">${open?'Open':'Acknowledged'}</span></div>
-      <div class="m">${esc(nodeName(s,i.node))} · opened ${ago(s.now-i.opened)}</div>
-      ${i.assigned.length?`<div class="chips">${i.assigned.map(a=>`<span class="chip">${ic('check')} ${esc(a.name)}</span>`).join('')}</div>`:''}
-      <div class="acts">${open?`<button class="sm primary" data-act="inc" data-a="ack" data-id="${i.id}">Acknowledge</button>`:''}
-        ${i.suggested.map(r=>`<button class="sm" data-act="alloc" data-id="${i.id}" data-rid="${r.id}">Send ${esc(r.name)}</button>`).join('')}
-        <button class="sm ghost" data-act="inc" data-a="resolve" data-id="${i.id}">Resolve</button></div></div></div>`}).join('')
-    ||`<div class="empty"><b>All clear</b>No active incidents.</div>`;
-  $('nodes').innerHTML=s.nodes.map(n=>{const d=n.data;
-    return `<div class="node ${n.online?'':'off'}"><div class="top"><span class="pill ${n.online?'ok':'off'}">${n.online?'Online':'Offline'}</span><span class="nm">${esc(n.name)}</span>
-      <span class="pill link">${esc(n.via).toUpperCase()}${n.rssi!=null?' · '+n.rssi+' dBm':''}</span><span class="ago">${ago(s.now-n.recv)}</span><span class="sp"></span>
-      <button class="sm" data-act="place" data-node="${esc(n.node)}">${n.lat==null?'Place on map':'Move'}</button><button class="sm ghost" data-act="rename" data-node="${esc(n.node)}" data-name="${esc(n.name)}">Rename</button></div>
-      <div class="tiles">
-        <div class="tile"><div class="l">${ic('flood')}Water level</div><div class="v">${d.level_cm>=0?d.level_cm:'—'}<small> cm</small></div><canvas id="ch-${esc(n.node)}-level_cm"></canvas></div>
-        <div class="tile"><div class="l">${ic('heat')}Temperature</div><div class="v">${d.temp_c??'—'}<small> °C</small></div><canvas id="ch-${esc(n.node)}-temp_c"></canvas></div>
-        <div class="tile"><div class="l">${ic('rain')}Rain</div><div class="v">${d.rain??'—'}<small> %</small></div><canvas id="ch-${esc(n.node)}-rain"></canvas></div></div>
-      <div class="nflags">${n.alerts.map(a=>`<span class="pill plain crit">${kind(a)[1]}</span>`).join('')||'<span class="pill ok">All readings normal</span>'}
-        ${d.flame?'<span class="pill plain crit">Flame detected</span>':''}${d.smoke>=0?`<span class="pill plain link">Smoke ${d.smoke}</span>`:''}</div></div>`}).join('')||'<div class="empty">No nodes have reported yet.</div>';
+function render(){
+  const s=state;if(!s)return;
+  if(!sel||!node(s,sel))sel=s.nodes.length?s.nodes[0].node:null;
+  const online=s.nodes.filter(n=>n.online).length,avail=s.resources.filter(r=>r.status==='available').length,
+    nc=s.incidents.filter(i=>kind(i.type)[2]==='crit').length,nw=s.incidents.length-nc,newest=s.nodes.length?Math.min(...s.nodes.map(n=>s.now-n.recv)):null;
+  $('strip').innerHTML=`<div class="stat ${nc?'crit':''}"><div class="k">Critical</div><div class="v">${nc}</div></div>
+    <div class="stat ${nw?'warn':''}"><div class="k">Warnings</div><div class="v">${nw}</div></div>
+    <div class="stat"><div class="k">Nodes online</div><div class="v">${online}<small> / ${s.nodes.length}</small></div></div>
+    <div class="stat"><div class="k">Units available</div><div class="v">${avail}<small> / ${s.resources.length}</small></div></div>
+    <div class="stat"><div class="k">Last observation</div><div class="v">${newest==null?'—':rel(newest)}<small>${newest==null?'':' ago'}</small></div></div>`;
+  $('nodeN').textContent=`${online} of ${s.nodes.length} reporting`;$('incN').textContent=s.incidents.length?`${s.incidents.length} active`:'';$('resN').textContent=`${avail} of ${s.resources.length} available`;
+  const incs=[...s.incidents].sort((a,b)=>SEVRANK[kind(a.type)[2]]-SEVRANK[kind(b.type)[2]]||b.opened-a.opened);
+  $('inc').innerHTML=incs.map(i=>{const [k,label,sev]=kind(i.type),open=i.status==='open',n=node(s,i.node),d=n?n.data:{};
+    const ctx={FLOOD:d.level_cm>=0?`Water level <b>${d.level_cm}</b> cm (threshold ${TH.level_cm})`:'',FIRE:'Flame sensor <b>triggered</b>',SMOKE:d.smoke>=0?`Smoke <b>${d.smoke}</b>`:'',HEAT:d.temp_c!=null?`Temperature <b>${d.temp_c}</b> °C (threshold ${TH.temp_c})`:'',HEAVY_RAIN:d.rain!=null?`Rain <b>${d.rain}</b> % (threshold ${TH.rain})`:''}[i.type]||'';
+    return `<div class="inc ${selInc===i.id?'sel':''}" style="--c:${COL[sev]}" data-act="sel-inc" data-id="${i.id}" data-node="${esc(i.node)}"><div class="bar"></div><div class="b">
+      <div class="l1"><span class="chip ${open&&sev==='crit'?'solid':sev}">${SEVLABEL[sev]}</span><span class="t">${ic(k)}${label}</span><span class="chip ${open?'warn':'info'}" style="margin-left:auto">${open?'Unacknowledged':'Acknowledged'}</span></div>
+      <div class="l2"><span class="mono">INC-${String(i.id).padStart(4,'0')}</span>·<span>${ic('pin')}</span><span>${esc(nodeName(s,i.node))}</span></div>
+      <div class="obs">Observed <b>${dtm(i.opened)}</b> · ${rel(s.now-i.opened)} ago</div>${ctx?`<div class="obs">${ctx}</div>`:''}
+      ${i.assigned.length?`<div class="asg"><b>Dispatched:</b> ${i.assigned.map(a=>esc(a.name)).join(', ')}</div>`:''}
+      <div class="acts">${open?`<button class="primary" data-act="inc" data-a="ack" data-id="${i.id}">Acknowledge</button>`:''}${i.suggested.map(r=>`<button data-act="alloc" data-id="${i.id}" data-rid="${r.id}">Dispatch ${esc(r.name)}</button>`).join('')}<button class="danger" data-act="inc" data-a="resolve" data-id="${i.id}">Resolve</button></div></div></div>`}).join('')
+    ||`<div class="empty"><b>No active incidents</b>All monitored nodes are within thresholds.</div>`;
+  $('nodes').innerHTML=s.nodes.length?`<table><thead><tr><th>Node</th><th>State</th><th>Link</th><th class="r">Level</th><th class="r">Temp</th><th class="r">Rain</th><th>Flame</th><th>Alerts</th><th class="r">Last obs.</th></tr></thead><tbody>${s.nodes.map(n=>{
+    const d=n.data,st=nstate(s,n),[lbl,cls]=NS[st],v=(x,u,over,bad)=>x==null||bad?`<span class="na">n/a</span>`:`<span class="num ${over?'over':''}">${x}</span><span class="unit">${u}</span>`;
+    return `<tr data-sel="${esc(n.node)}" class="${n.node===sel?'sel':''}"><td><div class="nm">${esc(n.name)}</div>${n.name!==n.node?`<div class="id">${esc(n.node)}</div>`:""}</td><td><span class="chip ${cls}">${lbl}</span></td>
+      <td><span class="chip info">${esc(n.via).toUpperCase()}</span>${n.rssi!=null?` <span class="num" style="color:var(--mute)">${n.rssi} dBm</span>`:''}</td>
+      <td class="r">${v(d.level_cm,'cm',d.level_cm>=TH.level_cm,d.level_cm<0)}</td><td class="r">${v(d.temp_c,'°C',d.temp_c>=TH.temp_c)}</td><td class="r">${v(d.rain,'%',d.rain>=TH.rain)}</td>
+      <td>${d.flame?'<span class="chip solid">Detected</span>':'<span style="color:var(--mute)">Clear</span>'}</td>
+      <td>${n.alerts.map(a=>`<span class="chip ${kind(a)[2]}">${kind(a)[1]}</span>`).join(' ')||'<span style="color:var(--mute)">None</span>'}</td>
+      <td class="r"><span class="num" style="color:var(--mute)">${hms(n.recv)}</span></td></tr>`}).join('')}</tbody></table>`
+    :`<div class="empty"><b>Awaiting first observation</b>No node has reported to this server yet.</div>`;
+  const sn=sel&&node(s,sel);
+  $('selName').textContent=sn?(sn.name!==sn.node?`${sn.name} · ${sn.node}`:sn.name):'';
+  $('selBtns').innerHTML=sn?`<button data-act="place" data-node="${esc(sn.node)}">${ic('pin')}${sn.lat==null?'Place on map':'Move on map'}</button> <button class="ghost" data-act="rename" data-node="${esc(sn.node)}" data-name="${esc(sn.name)}">Rename</button>`:'';
+  if(sn){const d=sn.data;
+    $('charts').innerHTML=`<div class="charts">${CHS.map(([k,l,u,th,sk])=>{const val=d[k],bad=val==null||(sk&&val<0);
+      return `<div class="chart"><div class="h"><b>${l}</b><span>${u}</span><span class="cur ${!bad&&val>=th?'over':''}">${bad?'<span class="na">n/a</span>':val}</span></div><canvas id="ch-${k}"></canvas></div>`}).join('')}</div>`;
+  }else $('charts').innerHTML='<div class="empty">Select a node to see its instrument readings.</div>';
   if(!document.activeElement||document.activeElement.tagName!=='SELECT')
-    $('res').innerHTML=s.resources.map(r=>`<div class="res"><b>${esc(r.name)}</b><span class="pill ${r.status==='available'?'ok':r.status==='deployed'?'warn':'off'}">${esc(r.status)}</span>
-      <select data-res="${r.id}" aria-label="Status of ${esc(r.name)}">${['available','deployed','unavailable'].map(o=>`<option ${o==r.status?'selected':''}>${o}</option>`).join('')}</select></div>`).join('');
+    $('res').innerHTML=`<table class="res"><tbody>${s.resources.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td><span class="chip ${r.status==='available'?'ok':r.status==='deployed'?'warn':'off'}">${esc(r.status)}</span></td><td><select data-res="${r.id}" aria-label="Status of ${esc(r.name)}">${['available','deployed','unavailable'].map(o=>`<option ${o==r.status?'selected':''}>${o}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table>`;
   drawCharts();drawMap();
-  try{const l=await (await fetch('/api/log?limit=12')).json();
-    $('log').innerHTML=l.map(e=>`<div><time>${new Date(e.time*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</time><span><b>${esc(e.officer)}</b> ${esc(e.text)}</span></div>`).join('')||'<div class="empty" style="padding:14px">No actions yet.</div>'}catch(e){}
 }
+async function tick(){
+  let s;try{s=await (await fetch('/api/state')).json();lastOk=Date.now();$('conn').className='chip ok';$('conn').textContent='Live'}
+  catch(e){$('conn').className='chip crit';$('conn').textContent=lastOk?'Connection lost · data stale':'Server unreachable';return}
+  state=s;detectNew(s);render();
+  try{const l=await (await fetch('/api/log?limit=12')).json();
+    $('log').innerHTML=l.map(e=>`<div><time>${hms(e.time)}</time><span><b>${esc(e.officer)}</b> ${esc(e.text)}</span></div>`).join('')||'<div class="empty" style="display:block;padding:14px">No operator actions recorded.</div>'}catch(e){}
+}
+function clock(){const d=new Date();$('clock').innerHTML=`LOCAL <b>${d.toLocaleTimeString([], {hour12:false})}</b><br>UTC <b>${d.toISOString().slice(11,19)}</b>`}
 
 // ---------- events ----------
 document.addEventListener('click',async e=>{
-  const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act;
+  const b=e.target.closest('[data-act]');
+  if(!b){const r=e.target.closest('[data-sel]');if(r)select(r.dataset.sel);return}
+  const a=b.dataset.act;
   if(a==='alerts')toggleAlerts();
   else if(a==='login-open')$('loginDlg').showModal();
   else if(a==='admin-open')$('adminDlg').showModal();
@@ -316,8 +366,9 @@ document.addEventListener('click',async e=>{
   else if(a==='locate')toggleLocate();
   else if(a==='place')startPlace(b.dataset.node);
   else if(a==='rename'){if(!me){toast('Sign in to rename nodes','bad');$('loginDlg').showModal();return}const nm=prompt('Node name',b.dataset.name);if(nm){await api('/api/nodes','POST',{node:b.dataset.node,name:nm});tick()}}
-  else if(a==='inc'){await api(`/api/incidents/${b.dataset.id}/${b.dataset.a}`,'POST',{});tick()}
-  else if(a==='alloc'){await api(`/api/incidents/${b.dataset.id}/allocate`,'POST',{resourceId:+b.dataset.rid});tick()}
+  else if(a==='sel-inc'){selInc=+b.dataset.id;select(b.dataset.node)}
+  else if(a==='inc'){e.stopPropagation();await api(`/api/incidents/${b.dataset.id}/${b.dataset.a}`,'POST',{});tick()}
+  else if(a==='alloc'){e.stopPropagation();await api(`/api/incidents/${b.dataset.id}/allocate`,'POST',{resourceId:+b.dataset.rid});tick()}
 });
 document.addEventListener('change',async e=>{const s=e.target.closest('[data-res]');if(s){await api('/api/resources','POST',{id:+s.dataset.res,status:s.value});tick()}});
 $('loginForm').addEventListener('submit',e=>{if(e.submitter&&e.submitter.value==='ok')doLogin()});
@@ -325,5 +376,6 @@ $('adminForm').addEventListener('submit',async e=>{if(!e.submitter||e.submitter.
   const r=await api('/api/officers','POST',{username:$('nu').value,password:$('np').value,role:$('nr').value});
   toast(r&&r.ok?'Officer added':'Could not add officer (name taken or password too short)',r&&r.ok?'good':'bad');$('nu').value=$('np').value=''});
 addEventListener('resize',drawCharts);
-authUI();setLocBtn();tick();setInterval(tick,2000);setInterval(loadHistory,10000);setTimeout(loadHistory,1200);
+$('inc').innerHTML=$('nodes').innerHTML=$('res').innerHTML='<div class="empty">Loading…</div>';
+authUI();setLocBtn();clock();setInterval(clock,1000);tick();setInterval(tick,2000);setInterval(loadHistory,10000);setTimeout(loadHistory,1200);
 </script>
