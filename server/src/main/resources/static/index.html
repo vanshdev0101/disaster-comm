@@ -77,6 +77,7 @@ th.r,td.r{text-align:right}tbody tr[data-sel]{cursor:pointer}tbody tr[data-sel]:
 tbody tr.sel td:not(:first-child){box-shadow:none}.nm{font-weight:600}.id{font:11px var(--mono);color:var(--mute)}
 .na{color:var(--dim);font-family:var(--mono)}.unit{color:var(--mute);font-size:11px;margin-left:2px}.over{color:var(--crit);font-weight:500}
 .tw{overflow-x:auto}
+.chg{animation:chg .9s ease-out}@keyframes chg{from{background:#38bdf83d}to{background:transparent}}
 
 /* ---- charts ---- */
 .charts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0}
@@ -324,32 +325,36 @@ function render(){
       <div class="acts">${open?`<button class="primary" data-act="inc" data-a="ack" data-id="${i.id}">Acknowledge</button>`:''}${i.suggested.map(r=>`<button data-act="alloc" data-id="${i.id}" data-rid="${r.id}">Dispatch ${esc(r.name)}</button>`).join('')}<button class="danger" data-act="inc" data-a="resolve" data-id="${i.id}">Resolve</button></div></div></div>`}).join('')
     ||`<div class="empty"><b>No active incidents</b>All monitored nodes are within thresholds.</div>`;
   $('nodes').innerHTML=s.nodes.length?`<table><thead><tr><th>Node</th><th>State</th><th>Link</th><th class="r">Level</th><th class="r">Temp</th><th class="r">Rain</th><th>Flame</th><th>Alerts</th><th class="r">Last obs.</th></tr></thead><tbody>${s.nodes.map(n=>{
-    const d=n.data,st=nstate(s,n),[lbl,cls]=NS[st],v=(x,u,over,bad)=>x==null||bad?`<span class="na">n/a</span>`:`<span class="num ${over?'over':''}">${x}</span><span class="unit">${u}</span>`;
+    const d=n.data,st=nstate(s,n),[lbl,cls]=NS[st],v=(x,u,over,bad,k)=>x==null||bad?`<span class="na">n/a</span>`:`<span class="num ${over?'over':''}" data-k="${esc(n.node)}:${k}" data-v="${x}">${x}</span><span class="unit">${u}</span>`;
     return `<tr data-sel="${esc(n.node)}" class="${n.node===sel?'sel':''}"><td><div class="nm">${esc(n.name)}</div>${n.name!==n.node?`<div class="id">${esc(n.node)}</div>`:""}</td><td><span class="chip ${cls}">${lbl}</span></td>
       <td><span class="chip info">${esc(n.via).toUpperCase()}</span>${n.rssi!=null?` <span class="num" style="color:var(--mute)">${n.rssi} dBm</span>`:''}</td>
-      <td class="r">${v(d.level_cm,'cm',d.level_cm>=TH.level_cm,d.level_cm<0)}</td><td class="r">${v(d.temp_c,'°C',d.temp_c>=TH.temp_c)}</td><td class="r">${v(d.rain,'%',d.rain>=TH.rain)}</td>
+      <td class="r">${v(d.level_cm,'cm',d.level_cm>=TH.level_cm,d.level_cm<0,'level')}</td><td class="r">${v(d.temp_c,'°C',d.temp_c>=TH.temp_c,false,'temp')}</td><td class="r">${v(d.rain,'%',d.rain>=TH.rain,false,'rain')}</td>
       <td>${d.flame?'<span class="chip solid">Detected</span>':'<span style="color:var(--mute)">Clear</span>'}</td>
       <td>${n.alerts.map(a=>`<span class="chip ${kind(a)[2]}">${kind(a)[1]}</span>`).join(' ')||'<span style="color:var(--mute)">None</span>'}</td>
-      <td class="r"><span class="num" style="color:var(--mute)">${hms(n.recv)}</span></td></tr>`}).join('')}</tbody></table>`
+      <td class="r"><span class="num" style="color:var(--mute)" data-k="${esc(n.node)}:recv" data-v="${n.recv}">${hms(n.recv)}</span></td></tr>`}).join('')}</tbody></table>`
     :`<div class="empty"><b>Awaiting first observation</b>No node has reported to this server yet.</div>`;
   const sn=sel&&node(s,sel);
   $('selName').textContent=sn?(sn.name!==sn.node?`${sn.name} · ${sn.node}`:sn.name):'';
   $('selBtns').innerHTML=sn?`<button data-act="place" data-node="${esc(sn.node)}">${ic('pin')}${sn.lat==null?'Place on map':'Move on map'}</button> <button class="ghost" data-act="rename" data-node="${esc(sn.node)}" data-name="${esc(sn.name)}">Rename</button>`:'';
   if(sn){const d=sn.data;
     $('charts').innerHTML=`<div class="charts">${CHS.map(([k,l,u,th,sk])=>{const val=d[k],bad=val==null||(sk&&val<0);
-      return `<div class="chart"><div class="h"><b>${l}</b><span>${u}</span><span class="cur ${!bad&&val>=th?'over':''}">${bad?'<span class="na">n/a</span>':val}</span></div><canvas id="ch-${k}"></canvas></div>`}).join('')}</div>`;
+      return `<div class="chart"><div class="h"><b>${l}</b><span>${u}</span><span class="cur ${!bad&&val>=th?'over':''}" data-k="c:${k}" data-v="${val}">${bad?'<span class="na">n/a</span>':val}</span></div><canvas id="ch-${k}"></canvas></div>`}).join('')}</div>`;
   }else $('charts').innerHTML='<div class="empty">Select a node to see its instrument readings.</div>';
   if(!document.activeElement||document.activeElement.tagName!=='SELECT')
     $('res').innerHTML=`<table class="res"><tbody>${s.resources.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td><span class="chip ${r.status==='available'?'ok':r.status==='deployed'?'warn':'off'}">${esc(r.status)}</span></td><td><select data-res="${r.id}" aria-label="Status of ${esc(r.name)}">${['available','deployed','unavailable'].map(o=>`<option ${o==r.status?'selected':''}>${o}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table>`;
-  drawCharts();drawMap();
+  flashChanges();drawCharts();drawMap();
 }
+const prevVal={};
+function flashChanges(){document.querySelectorAll('[data-k]').forEach(el=>{const k=el.dataset.k,v=el.dataset.v;if(k in prevVal&&prevVal[k]!==v)el.classList.add('chg');prevVal[k]=v})}
 async function tick(){
   let s;try{s=await (await fetch('/api/state')).json();lastOk=Date.now();$('conn').className='chip ok';$('conn').textContent='Live'}
   catch(e){$('conn').className='chip crit';$('conn').textContent=lastOk?'Connection lost · data stale':'Server unreachable';return}
   state=s;detectNew(s);render();
+  if(tick.n++%5)return;
   try{const l=await (await fetch('/api/log?limit=12')).json();
     $('log').innerHTML=l.map(e=>`<div><time>${hms(e.time)}</time><span><b>${esc(e.officer)}</b> ${esc(e.text)}</span></div>`).join('')||'<div class="empty" style="display:block;padding:14px">No operator actions recorded.</div>'}catch(e){}
 }
+tick.n=0;
 function clock(){const d=new Date();$('clock').innerHTML=`LOCAL <b>${d.toLocaleTimeString([], {hour12:false})}</b><br>UTC <b>${d.toISOString().slice(11,19)}</b>`}
 
 // ---------- events ----------
@@ -377,5 +382,5 @@ $('adminForm').addEventListener('submit',async e=>{if(!e.submitter||e.submitter.
   toast(r&&r.ok?'Officer added':'Could not add officer (name taken or password too short)',r&&r.ok?'good':'bad');$('nu').value=$('np').value=''});
 addEventListener('resize',drawCharts);
 $('inc').innerHTML=$('nodes').innerHTML=$('res').innerHTML='<div class="empty">Loading…</div>';
-authUI();setLocBtn();clock();setInterval(clock,1000);tick();setInterval(tick,2000);setInterval(loadHistory,10000);setTimeout(loadHistory,1200);
+authUI();setLocBtn();clock();setInterval(clock,1000);tick();setInterval(tick,1000);setInterval(loadHistory,3000);setTimeout(loadHistory,1200);
 </script>

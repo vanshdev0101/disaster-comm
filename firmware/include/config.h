@@ -8,7 +8,7 @@
 #endif
 
 #define NODE_ID "node1"
-#define INTERVAL_MS 10000
+#define INTERVAL_MS 3000
 #define LORA_FREQ 433E6  // Ra-02 (SX1278) is a 410-525 MHz part. Both radios must match; use 866E6 only with an 868 MHz RFM95W
 
 // LoRa (RFM95/Ra-02) on VSPI
