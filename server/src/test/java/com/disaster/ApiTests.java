@@ -32,12 +32,12 @@ class ApiTests {
         assertEquals(List.of("FLOOD", "FIRE"), node("n2").get("alerts"));
         assertEquals("lora", node("n2").get("via"));
 
-        api.setStatus(new Api.StatusIn(1L, "deployed"));
+        api.setStatus(new Api.StatusIn(1L, "deployed"), "tester");
         @SuppressWarnings("unchecked")
         List<Resource> res = (List<Resource>) api.state().get("resources");
         assertEquals("deployed", res.get(0).status);
         assertEquals(4, res.size());
-        api.setStatus(new Api.StatusIn(1L, "available"));  // shared in-memory DB: leave it clean
+        api.setStatus(new Api.StatusIn(1L, "available"), "tester");  // shared in-memory DB: leave it clean
     }
 
     @Autowired Officer officer;
@@ -62,13 +62,13 @@ class ApiTests {
         assertEquals(List.of("Rescue boat", "Relief food kits"), sug.stream().map(m -> m.get("name")).toList());
 
         Long id = (Long) inc.get("id"), boat = (Long) sug.get(0).get("id");
-        officer.allocate(id, new Officer.AllocIn(boat));
+        officer.allocate(id, new Officer.AllocIn(boat), "tester");
         assertEquals("acknowledged", incident("o1").get("status"));
         assertEquals(1, ((List<?>) incident("o1").get("assigned")).size());
         assertThrows(org.springframework.web.server.ResponseStatusException.class,
-                () -> officer.allocate(id, new Officer.AllocIn(boat)), "already deployed");
+                () -> officer.allocate(id, new Officer.AllocIn(boat), "tester"), "already deployed");
 
-        officer.resolve(id);
+        officer.resolve(id, "tester");
         assertTrue(((List<?>) api.state().get("incidents")).stream()
                 .noneMatch(i -> ((Map<String, Object>) i).get("node").equals("o1")));
         assertEquals("available", ((List<Resource>) api.state().get("resources")).stream()

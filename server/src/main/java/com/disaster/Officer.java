@@ -30,10 +30,12 @@ public class Officer {
 
     private final IncidentRepo incidents;
     private final ResourceRepo resources;
+    private final Audit audit;
 
-    Officer(IncidentRepo incidents, ResourceRepo resources) {
+    Officer(IncidentRepo incidents, ResourceRepo resources, Audit audit) {
         this.incidents = incidents;
         this.resources = resources;
+        this.audit = audit;
     }
 
     /** One unresolved incident per node+alert type, so a sensor that stays in alarm doesn't spam. */
@@ -80,15 +82,17 @@ public class Officer {
     }
 
     @PostMapping("/{id}/ack")
-    public Map<String, Boolean> ack(@PathVariable Long id) {
+    public Map<String, Boolean> ack(@PathVariable Long id,
+                                    @RequestAttribute(value = "officer", required = false) String who) {
         Incident i = get(id, true);
-        if ("open".equals(i.status)) { i.status = "acknowledged"; incidents.save(i); }
+        if ("open".equals(i.status)) { i.status = "acknowledged"; incidents.save(i); audit.log(who, "acknowledged " + i.type + " on " + i.node); }
         return Map.of("ok", true);
     }
 
     @Transactional
     @PostMapping("/{id}/allocate")
-    public Map<String, Boolean> allocate(@PathVariable Long id, @Valid @RequestBody AllocIn in) {
+    public Map<String, Boolean> allocate(@PathVariable Long id, @Valid @RequestBody AllocIn in,
+                                         @RequestAttribute(value = "officer", required = false) String who) {
         Incident i = get(id, true);
         Resource r = resources.findById(in.resourceId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -96,18 +100,21 @@ public class Officer {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "resource not available");
         r.status = "deployed"; r.incident = i.id;
         resources.save(r);
+        audit.log(who, "sent " + r.name + " to " + i.type + " on " + i.node);
         if ("open".equals(i.status)) { i.status = "acknowledged"; incidents.save(i); }  // acting on it implies ack
         return Map.of("ok", true);
     }
 
     @Transactional
     @PostMapping("/{id}/resolve")
-    public Map<String, Boolean> resolve(@PathVariable Long id) {
+    public Map<String, Boolean> resolve(@PathVariable Long id,
+                                        @RequestAttribute(value = "officer", required = false) String who) {
         Incident i = get(id, true);
         for (Resource r : resources.findAll())
             if (i.id.equals(r.incident)) { r.status = "available"; r.incident = null; resources.save(r); }
         i.status = "resolved";
         incidents.save(i);
+        audit.log(who, "resolved " + i.type + " on " + i.node);
         return Map.of("ok", true);
     }
 }

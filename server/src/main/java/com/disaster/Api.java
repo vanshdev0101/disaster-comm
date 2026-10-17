@@ -14,6 +14,8 @@ import org.springframework.web.server.ResponseStatusException;
 interface ReadingRepo extends JpaRepository<Reading, Long> {
     boolean existsByNodeAndBootAndSeq(String node, long boot, long seq);
 
+    List<Reading> findByNodeAndRecvGreaterThanOrderByRecv(String node, double recv);
+
     @Query("select r from Reading r where r.id in (select max(x.id) from Reading x group by x.node) order by r.node")
     List<Reading> latestPerNode();
 }
@@ -33,11 +35,17 @@ public class Api {
     private final ReadingRepo readings;
     private final ResourceRepo resources;
     private final Officer officer;
+    private final NodeRepo nodeInfo;
+    private final Audit audit;
 
-    Api(ReadingRepo readings, ResourceRepo resources, Officer officer) {
+    static final double OFFLINE_S = 60;  // node interval is ~10 s; a minute of silence = offline
+
+    Api(ReadingRepo readings, ResourceRepo resources, Officer officer, NodeRepo nodeInfo, Audit audit) {
         this.readings = readings;
         this.resources = resources;
         this.officer = officer;
+        this.nodeInfo = nodeInfo;
+        this.audit = audit;
     }
 
     @Bean
@@ -83,6 +91,9 @@ public class Api {
     @GetMapping("/state")
     public Map<String, Object> state() {
         List<Map<String, Object>> nodes = new ArrayList<>();
+        double now = System.currentTimeMillis() / 1000.0;
+        Map<String, NodeInfo> info = new HashMap<>();
+        nodeInfo.findAll().forEach(x -> info.put(x.node, x));
         for (Reading r : readings.latestPerNode()) {
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("level_cm", r.levelCm); data.put("rain", r.rain); data.put("temp_c", r.tempC);
@@ -90,18 +101,24 @@ public class Api {
             Map<String, Object> n = new LinkedHashMap<>();
             n.put("node", r.node); n.put("recv", r.recv); n.put("via", r.via); n.put("rssi", r.rssi);
             n.put("data", data); n.put("alerts", alerts(r));
+            NodeInfo ni = info.get(r.node);
+            n.put("name", ni == null || ni.name == null ? r.node : ni.name);
+            n.put("lat", ni == null ? null : ni.lat); n.put("lon", ni == null ? null : ni.lon);
+            n.put("online", now - r.recv < OFFLINE_S);
             nodes.add(n);
         }
-        return Map.of("now", System.currentTimeMillis() / 1000.0, "nodes", nodes, "incidents", officer.active(),
+        return Map.of("now", now, "nodes", nodes, "incidents", officer.active(),
                 "resources", resources.findAll(org.springframework.data.domain.Sort.by("id")));
     }
 
     @PostMapping("/resources")
-    public Map<String, Boolean> setStatus(@Valid @RequestBody StatusIn in) {
+    public Map<String, Boolean> setStatus(@Valid @RequestBody StatusIn in,
+                                          @RequestAttribute(value = "officer", required = false) String who) {
         Resource r = resources.findById(in.id())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         r.status = in.status();
         resources.save(r);
+        audit.log(who, "set " + r.name + " to " + in.status());
         return Map.of("ok", true);
     }
 }

@@ -1,37 +1,169 @@
 <!doctype html>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Disaster Control Station</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
-body{font:15px system-ui,sans-serif;margin:16px;background:#1e2326;color:#d3c6aa}
-h1{font-size:18px}.grid{display:flex;flex-wrap:wrap;gap:12px}
-.card{background:#272e33;border-radius:8px;padding:12px;min-width:230px;border:2px solid #374145}
-.card.alert{border-color:#e67e80}.badge{background:#e67e80;color:#1e2326;border-radius:4px;padding:1px 6px;margin-right:4px;font-weight:600}
-.dim{opacity:.6}button{background:#374145;color:inherit;border:0;border-radius:4px;padding:3px 8px;margin:3px 3px 0 0;cursor:pointer}button:hover{background:#4b565c}select{background:#374145;color:inherit;border:0;padding:3px}
+:root{--bg:#1e2326;--card:#272e33;--line:#374145;--fg:#d3c6aa;--red:#e67e80;--green:#a7c080;--yellow:#dbbc7f;--blue:#7fbbb3;--grey:#859289}
+body{font:15px system-ui,sans-serif;margin:0 0 40px;background:var(--bg);color:var(--fg)}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1000}
+header h1{font-size:18px;margin:0;flex:1;min-width:200px}
+main{padding:0 16px}h2{font-size:16px;margin:18px 0 8px}
+.grid{display:flex;flex-wrap:wrap;gap:12px}
+.card{background:var(--card);border-radius:8px;padding:12px;min-width:240px;flex:1 1 260px;max-width:420px;border:2px solid var(--line)}
+.card.alert{border-color:var(--red)}.card.off{opacity:.6;border-style:dashed}
+.badge{background:var(--red);color:var(--bg);border-radius:4px;padding:1px 6px;margin-right:4px;font-weight:600;font-size:13px}
+.badge.ok{background:var(--green)}.badge.warn{background:var(--yellow)}.badge.link{background:var(--blue)}
+.dim{opacity:.65}.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+button,input,select{background:var(--line);color:inherit;border:0;border-radius:4px;padding:5px 9px;font:inherit}
+button{cursor:pointer;margin:3px 3px 0 0}button:hover{background:#4b565c}button.pri{background:var(--green);color:var(--bg);font-weight:600}
+input{width:110px}#map{height:340px;border-radius:8px;border:2px solid var(--line);background:#2d353b}
+canvas{width:100%;height:56px;display:block;margin-top:4px}.cap{font-size:12px;opacity:.7;margin-top:6px}
+#banners{position:fixed;right:12px;top:64px;z-index:2000;display:flex;flex-direction:column;gap:8px;max-width:340px}
+.banner{background:var(--red);color:var(--bg);padding:10px 12px;border-radius:8px;font-weight:600;animation:flash 1s 4;cursor:pointer;box-shadow:0 2px 8px #0008}
+.banner.info{background:var(--green)}@keyframes flash{50%{filter:brightness(1.5)}}
+.log div{padding:3px 0;border-bottom:1px solid var(--line);font-size:14px}
 </style>
-<h1>Disaster Control Station</h1>
-<div class="grid" id="nodes"></div>
-<h1>Incidents</h1><div class="grid" id="inc"></div>
-<h1>Resources</h1><div class="grid" id="res"></div>
+<header>
+  <h1>Disaster Control Station <span id="conn" class="badge warn">connecting</span></h1>
+  <button id="alertBtn" onclick="toggleAlerts()">Alerts: off</button>
+  <span id="auth"></span>
+</header>
+<div id="banners"></div>
+<main>
+<h2>Map</h2><div id="map"><p class="dim" style="padding:12px">Map needs Internet for tiles; node status below still works.</p></div>
+<div class="cap" id="mapHint"></div>
+<h2>Nodes</h2><div class="grid" id="nodes"></div>
+<h2>Incidents</h2><div class="grid" id="inc"></div>
+<h2>Resources</h2><div class="grid" id="res"></div>
+<h2>Activity</h2><div class="card log" id="log" style="max-width:640px"></div>
+<div id="admin"></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 const $=id=>document.getElementById(id);
-async function tick(){
-  try{
-    const s=await (await fetch('/api/state')).json();
-    $('nodes').innerHTML=s.nodes.map(n=>{
-      const d=n.data,age=Math.round(s.now-n.recv);
-      return `<div class="card ${n.alerts.length?'alert':''}"><b>${n.node}</b> <span class="dim">via ${n.via}${n.rssi!=null?' ('+n.rssi+' dBm)':''}, ${age}s ago</span><br>
-      ${n.alerts.map(a=>`<span class="badge">${a}</span>`).join('')||'<span class="dim">normal</span>'}<br>
-      level ${d.level_cm??'-'} cm · rain ${d.rain??'-'}% · temp ${d.temp_c??'-'} °C<br>smoke ${d.smoke>=0?d.smoke:'n/a'} · flame ${d.flame?'YES':'no'}</div>`}).join('')||'<span class="dim">no data yet</span>';
-    $('inc').innerHTML=s.incidents.map(i=>`<div class="card alert"><span class="badge">${i.type}</span><b>${i.node}</b> <span class="dim">${i.status}, ${Math.round(s.now-i.opened)}s ago</span><br>
-      deployed: ${i.assigned.map(a=>a.name).join(', ')||'<span class="dim">none</span>'}<br>
-      ${i.suggested.map(r=>`<button onclick="act(${i.id},'allocate',${r.id})">Send ${r.name}</button>`).join('')}
-      ${i.status=='open'?`<button onclick="act(${i.id},'ack')">Acknowledge</button>`:''}<button onclick="act(${i.id},'resolve')">Resolve</button></div>`).join('')||'<span class="dim">no active incidents</span>';
-    if(!document.activeElement||document.activeElement.tagName!=='SELECT')
-      $('res').innerHTML=s.resources.map(r=>`<div class="card"><b>${r.name}</b><br>
-      <select onchange="setRes(${r.id},this.value)">${['available','deployed','unavailable'].map(o=>`<option ${o==r.status?'selected':''}>${o}</option>`).join('')}</select></div>`).join('');
-  }catch(e){}
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let me=null,token=null,state=null,alertsOn=false,seenInc=null,wasOnline={},history={},placing=null,map=null,markers={},actx=null;
+try{const s=JSON.parse(sessionStorage.getItem('me')||'null');if(s){me=s;token=s.token}}catch(e){}
+try{alertsOn=localStorage.getItem('alerts')==='1'}catch(e){}
+
+// ---------- auth ----------
+function authUI(){
+  $('auth').innerHTML=me?`<span class="dim">${esc(me.username)} (${esc(me.role)})</span> <button onclick="logout()">Log out</button>`
+    :`<input id="u" placeholder="username" autocomplete="username"> <input id="p" type="password" placeholder="password" autocomplete="current-password" onkeydown="if(event.key=='Enter')login()"> <button class="pri" onclick="login()">Log in</button>`;
+  $('admin').innerHTML=me&&me.role==='admin'?`<h2>Add officer</h2><div class="card" style="max-width:420px"><input id="nu" placeholder="username"> <input id="np" type="password" placeholder="password (6+)"> <select id="nr"><option>officer</option><option>admin</option></select> <button onclick="addOfficer()">Add</button></div>`:'';
 }
-async function act(id,a,resourceId){await fetch(`/api/incidents/${id}/${a}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(resourceId?{resourceId}:{})});tick()}
-async function setRes(id,status){await fetch('/api/resources',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,status})});tick()}
-tick();setInterval(tick,2000);
+async function login(){
+  const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:$('u').value,password:$('p').value})});
+  if(!r.ok){banner('Wrong username or password',true);return}
+  me=await r.json();token=me.token;try{sessionStorage.setItem('me',JSON.stringify(me))}catch(e){}
+  authUI();tick();
+}
+async function logout(){await api('/api/logout','POST');me=token=null;try{sessionStorage.removeItem('me')}catch(e){}authUI();tick()}
+async function addOfficer(){
+  const r=await api('/api/officers','POST',{username:$('nu').value,password:$('np').value,role:$('nr').value});
+  banner(r&&r.ok?'Officer added':'Could not add officer (name taken or password too short)',!(r&&r.ok));
+}
+async function api(path,method='GET',body){
+  const h={'Content-Type':'application/json'};if(token)h.Authorization='Bearer '+token;
+  const r=await fetch(path,{method,headers:h,body:body?JSON.stringify(body):undefined});
+  if(r.status===401&&token){me=token=null;try{sessionStorage.removeItem('me')}catch(e){}authUI();banner('Session ended, log in again',true);return null}
+  if(r.status===401){banner('Log in to do that',true);return null}
+  return r.ok?r.json():null;
+}
+
+// ---------- alerts ----------
+function toggleAlerts(){
+  alertsOn=!alertsOn;try{localStorage.setItem('alerts',alertsOn?'1':'0')}catch(e){}
+  if(alertsOn){try{actx=actx||new AudioContext();if('Notification' in window&&Notification.permission==='default')Notification.requestPermission()}catch(e){}beep()}
+  $('alertBtn').textContent='Alerts: '+(alertsOn?'on':'off');
+}
+function beep(){
+  try{actx=actx||new AudioContext();for(let i=0;i<3;i++){const o=actx.createOscillator(),g=actx.createGain();o.connect(g);g.connect(actx.destination);o.frequency.value=880;
+    g.gain.setValueAtTime(.25,actx.currentTime+i*.3);g.gain.setValueAtTime(0,actx.currentTime+i*.3+.18);o.start(actx.currentTime+i*.3);o.stop(actx.currentTime+i*.3+.2)}}catch(e){}
+}
+function banner(msg,bad=false,sound=false){
+  const d=document.createElement('div');d.className='banner'+(bad?'':' info');d.textContent=msg;d.onclick=()=>d.remove();$('banners').append(d);
+  setTimeout(()=>d.remove(),bad?20000:6000);
+  if(sound&&alertsOn){beep();try{if(Notification.permission==='granted')new Notification('Disaster Control Station',{body:msg})}catch(e){}}
+}
+function detectNew(s){
+  const ids=new Set(s.incidents.map(i=>i.id));
+  if(seenInc===null){seenInc=ids;}else{
+    for(const i of s.incidents)if(!seenInc.has(i.id))banner(`NEW ${i.type} at ${nodeName(s,i.node)}`,true,true);
+    seenInc=new Set([...seenInc,...ids]);}
+  for(const n of s.nodes){
+    if(n.node in wasOnline){
+      if(wasOnline[n.node]&&!n.online)banner(`${n.name} went OFFLINE`,true,true);
+      if(!wasOnline[n.node]&&n.online)banner(`${n.name} is back online`);}
+    wasOnline[n.node]=n.online;}
+}
+const nodeName=(s,id)=>(s.nodes.find(n=>n.node===id)||{}).name||id;
+
+// ---------- charts ----------
+function spark(c,vals,color){
+  const w=c.width=c.clientWidth*2,h=c.height=112,x=c.getContext('2d');x.clearRect(0,0,w,h);
+  const v=vals.filter(a=>a!=null&&a>-1);if(v.length<2){x.fillStyle='#859289';x.font='22px sans-serif';x.fillText('collecting data…',8,60);return}
+  const lo=Math.min(...v),hi=Math.max(...v),span=hi-lo||1;x.strokeStyle=color;x.lineWidth=3;x.beginPath();
+  vals.forEach((a,i)=>{if(a==null||a<0&&color==='#7fbbb3')return;const px=i/(vals.length-1)*(w-8)+4,py=h-8-(a-lo)/span*(h-24);i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke();
+  x.fillStyle='#859289';x.font='20px sans-serif';x.fillText(hi.toFixed(1),6,18);x.fillText(lo.toFixed(1),6,h-2);
+}
+function drawCharts(){
+  for(const n of state?state.nodes:[]){const h=history[n.node]||[];
+    for(const [k,col] of [['level_cm','#7fbbb3'],['temp_c','#dbbc7f'],['rain','#a7c080']]){
+      const c=document.getElementById(`ch-${n.node}-${k}`);if(c)spark(c,h.map(r=>r[k]),col)}}
+}
+async function loadHistory(){
+  if(!state)return;
+  for(const n of state.nodes){try{history[n.node]=await (await fetch(`/api/history?node=${encodeURIComponent(n.node)}&minutes=30`)).json()}catch(e){}}
+  drawCharts();
+}
+
+// ---------- map ----------
+function drawMap(){
+  if(typeof L==='undefined'||!state)return;
+  if(!map){map=L.map('map').setView([13.0827,80.2707],12);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
+    map.on('click',async e=>{if(!placing)return;if(!me){banner('Log in to place nodes',true);return}
+      await api('/api/nodes','POST',{node:placing,lat:e.latlng.lat,lon:e.latlng.lng});placing=null;$('mapHint').textContent='';tick()})}
+  const pts=[];
+  for(const n of state.nodes){
+    if(n.lat==null)continue;pts.push([n.lat,n.lon]);
+    const col=!n.online?'#859289':n.alerts.length?'#e67e80':'#a7c080';
+    const txt=`<b>${esc(n.name)}</b><br>${n.online?'online':'OFFLINE'} via ${esc(n.via)}<br>${n.alerts.join(', ')||'normal'}`;
+    if(markers[n.node]){markers[n.node].setLatLng([n.lat,n.lon]).setStyle({color:col,fillColor:col}).setPopupContent(txt)}
+    else markers[n.node]=L.circleMarker([n.lat,n.lon],{radius:11,color:col,fillColor:col,fillOpacity:.7}).addTo(map).bindPopup(txt)}
+  if(pts.length&&!drawMap.fit){map.fitBounds(pts,{maxZoom:16,padding:[40,40]});drawMap.fit=true}
+}
+function place(id){if(!me){banner('Log in to place nodes',true);return}placing=id;$('mapHint').textContent=`Click the map to place ${id}…`;window.scrollTo({top:0,behavior:'smooth'})}
+async function rename(id,old){if(!me){banner('Log in to rename nodes',true);return}const nm=prompt('Node name',old);if(nm){await api('/api/nodes','POST',{node:id,name:nm});tick()}}
+
+// ---------- main refresh ----------
+async function act(id,a,resourceId){await api(`/api/incidents/${id}/${a}`,'POST',resourceId?{resourceId}:{});tick()}
+async function setRes(id,status){await api('/api/resources','POST',{id,status});tick()}
+async function tick(){
+  let s;try{s=await (await fetch('/api/state')).json();$('conn').className='badge ok';$('conn').textContent='live'}catch(e){$('conn').className='badge';$('conn').textContent='server unreachable';return}
+  state=s;detectNew(s);
+  $('nodes').innerHTML=s.nodes.map(n=>{const d=n.data,age=Math.round(s.now-n.recv);
+    return `<div class="card ${n.alerts.length?'alert':''} ${n.online?'':'off'}">
+    <b><span class="dot" style="background:${n.online?'#a7c080':'#859289'}"></span>${esc(n.name)}</b> <span class="badge link">${esc(n.via)}${n.rssi!=null?' '+n.rssi+' dBm':''}</span>
+    <span class="dim">${n.online?age+'s ago':'OFFLINE, last seen '+age+'s ago'}</span><br>
+    ${n.alerts.map(a=>`<span class="badge">${a}</span>`).join('')||'<span class="dim">normal</span>'}<br>
+    level ${d.level_cm>=0?d.level_cm:'-'} cm · rain ${d.rain??'-'}% · temp ${d.temp_c??'-'} °C · flame ${d.flame?'<b style="color:#e67e80">YES</b>':'no'}${d.smoke>=0?' · smoke '+d.smoke:''}
+    <div class="cap">water level (cm, last 30 min)</div><canvas id="ch-${n.node}-level_cm"></canvas>
+    <div class="cap">temperature (°C)</div><canvas id="ch-${n.node}-temp_c"></canvas>
+    <div class="cap">rain (%)</div><canvas id="ch-${n.node}-rain"></canvas>
+    <button onclick="place('${esc(n.node)}')">${n.lat==null?'Place on map':'Move on map'}</button><button onclick="rename('${esc(n.node)}','${esc(n.name)}')">Rename</button></div>`}).join('')||'<span class="dim">no data yet</span>';
+  $('inc').innerHTML=s.incidents.map(i=>`<div class="card alert"><span class="badge">${esc(i.type)}</span><b>${esc(nodeName(s,i.node))}</b> <span class="dim">${esc(i.status)}, ${Math.round(s.now-i.opened)}s ago</span><br>
+    deployed: ${i.assigned.map(a=>esc(a.name)).join(', ')||'<span class="dim">none</span>'}<br>
+    ${i.suggested.map(r=>`<button onclick="act(${i.id},'allocate',${r.id})">Send ${esc(r.name)}</button>`).join('')}
+    ${i.status=='open'?`<button onclick="act(${i.id},'ack')">Acknowledge</button>`:''}<button onclick="act(${i.id},'resolve')">Resolve</button></div>`).join('')||'<span class="dim">no active incidents</span>';
+  if(!document.activeElement||document.activeElement.tagName!=='SELECT')
+    $('res').innerHTML=s.resources.map(r=>`<div class="card"><b>${esc(r.name)}</b><br>
+    <select onchange="setRes(${r.id},this.value)">${['available','deployed','unavailable'].map(o=>`<option ${o==r.status?'selected':''}>${o}</option>`).join('')}</select></div>`).join('');
+  drawCharts();drawMap();
+  try{const l=await (await fetch('/api/log?limit=12')).json();
+    $('log').innerHTML=l.map(e=>`<div><span class="dim">${new Date(e.time*1000).toLocaleTimeString()}</span> <b>${esc(e.officer)}</b> ${esc(e.text)}</div>`).join('')||'<span class="dim">no actions yet</span>'}catch(e){}
+}
+$('alertBtn').textContent='Alerts: '+(alertsOn?'on':'off');
+authUI();tick();setInterval(tick,2000);setInterval(loadHistory,10000);setTimeout(loadHistory,1500);
 </script>
