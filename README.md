@@ -17,6 +17,29 @@ cd server
 ./mvnw verify             # tests
 ```
 
+### Dashboard features
+- **Login:** viewing is open; acknowledging, allocating, resolving, renaming and placing nodes need an officer login.
+  First start creates `admin` / `admin123` (a warning is printed). Change it with `disaster.admin.password=...` in
+  `server/src/main/resources/application.properties` before the first run, then add officers from the dashboard (admin only).
+- **Audit log:** every officer action is recorded with the officer's name.
+- **Map + node status:** click "Place on map" on a node card, then click the map. Nodes show online/offline (no data for 60 s),
+  Wi-Fi vs LoRa link and signal strength. The map needs Internet for tiles; everything else works offline.
+- **History charts:** water level, temperature and rain for the last 30 minutes.
+- **Alerts:** press "Alerts: on" for a beep, banner and browser notification on new incidents or a node going offline.
+
+## Windows
+Needs JDK 21 (Temurin), Git and, for the simulator, Python 3. In PowerShell:
+```
+git clone https://github.com/vanshdev0101/disaster-comm.git
+cd disaster-comm\server
+.\mvnw.cmd spring-boot:run          # then open http://localhost:8000
+# second window: fake node, no hardware needed
+cd disaster-comm\backend; py sim.py flood
+```
+With boards: install the CP210x driver, copy `firmware\include\secrets.example.h` to `secrets.h`, set Wi-Fi and the PC's LAN IP
+(`ipconfig`), allow TCP 8000 in Windows Firewall, then `pio run -e node -t upload` / `-e gateway`.
+Not yet run on Windows by the author.
+
 ## Python prototype
 ```
 cd backend
@@ -42,4 +65,3 @@ Open TCP 8000 in the PC firewall so the ESP32s can reach the backend.
 Working end to end on real hardware (Linux): node (temperature, flame, rain, water level) -> Wi-Fi -> server -> dashboard,
 and node -> LoRa (433 MHz, Ra-02) -> gateway -> server when the server/Wi-Fi is unreachable.
 Smoke (MQ-2) is not fitted: `HAVE_SMOKE 0` in `firmware/include/config.h` reports "no sensor".
-Windows: server and simulator only need JDK 21 / Python; see the Windows section when added.
