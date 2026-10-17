@@ -1,0 +1,37 @@
+<!doctype html>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Disaster Control Station</title>
+<style>
+body{font:15px system-ui,sans-serif;margin:16px;background:#1e2326;color:#d3c6aa}
+h1{font-size:18px}.grid{display:flex;flex-wrap:wrap;gap:12px}
+.card{background:#272e33;border-radius:8px;padding:12px;min-width:230px;border:2px solid #374145}
+.card.alert{border-color:#e67e80}.badge{background:#e67e80;color:#1e2326;border-radius:4px;padding:1px 6px;margin-right:4px;font-weight:600}
+.dim{opacity:.6}button{background:#374145;color:inherit;border:0;border-radius:4px;padding:3px 8px;margin:3px 3px 0 0;cursor:pointer}button:hover{background:#4b565c}select{background:#374145;color:inherit;border:0;padding:3px}
+</style>
+<h1>Disaster Control Station</h1>
+<div class="grid" id="nodes"></div>
+<h1>Incidents</h1><div class="grid" id="inc"></div>
+<h1>Resources</h1><div class="grid" id="res"></div>
+<script>
+const $=id=>document.getElementById(id);
+async function tick(){
+  try{
+    const s=await (await fetch('/api/state')).json();
+    $('nodes').innerHTML=s.nodes.map(n=>{
+      const d=n.data,age=Math.round(s.now-n.recv);
+      return `<div class="card ${n.alerts.length?'alert':''}"><b>${n.node}</b> <span class="dim">via ${n.via}${n.rssi!=null?' ('+n.rssi+' dBm)':''}, ${age}s ago</span><br>
+      ${n.alerts.map(a=>`<span class="badge">${a}</span>`).join('')||'<span class="dim">normal</span>'}<br>
+      level ${d.level_cm??'-'} cm · rain ${d.rain??'-'}% · temp ${d.temp_c??'-'} °C<br>smoke ${d.smoke>=0?d.smoke:'n/a'} · flame ${d.flame?'YES':'no'}</div>`}).join('')||'<span class="dim">no data yet</span>';
+    $('inc').innerHTML=s.incidents.map(i=>`<div class="card alert"><span class="badge">${i.type}</span><b>${i.node}</b> <span class="dim">${i.status}, ${Math.round(s.now-i.opened)}s ago</span><br>
+      deployed: ${i.assigned.map(a=>a.name).join(', ')||'<span class="dim">none</span>'}<br>
+      ${i.suggested.map(r=>`<button onclick="act(${i.id},'allocate',${r.id})">Send ${r.name}</button>`).join('')}
+      ${i.status=='open'?`<button onclick="act(${i.id},'ack')">Acknowledge</button>`:''}<button onclick="act(${i.id},'resolve')">Resolve</button></div>`).join('')||'<span class="dim">no active incidents</span>';
+    if(!document.activeElement||document.activeElement.tagName!=='SELECT')
+      $('res').innerHTML=s.resources.map(r=>`<div class="card"><b>${r.name}</b><br>
+      <select onchange="setRes(${r.id},this.value)">${['available','deployed','unavailable'].map(o=>`<option ${o==r.status?'selected':''}>${o}</option>`).join('')}</select></div>`).join('');
+  }catch(e){}
+}
+async function act(id,a,resourceId){await fetch(`/api/incidents/${id}/${a}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(resourceId?{resourceId}:{})});tick()}
+async function setRes(id,status){await fetch('/api/resources',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,status})});tick()}
+tick();setInterval(tick,2000);
+</script>

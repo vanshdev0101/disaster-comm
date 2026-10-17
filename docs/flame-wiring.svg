@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="620" font-family="sans-serif">
+<rect width="1000" height="620" fill="#fff"/>
+<text x="500" y="38" font-size="24" text-anchor="middle" font-weight="bold">Flame sensor (HW-072) wiring - 3 wires</text>
+<!-- sensor -->
+<rect x="40" y="150" width="190" height="260" rx="10" fill="#1d4ed8"/>
+<text x="135" y="200" font-size="18" fill="#fff" text-anchor="middle">FLAME SENSOR</text>
+<text x="135" y="225" font-size="14" fill="#fff" text-anchor="middle">HW-072 (pins face right)</text>
+<g font-size="16" font-weight="bold">
+<rect x="230" y="233" width="50" height="14" fill="#dc2626"/><text x="205" y="262" fill="#fff" text-anchor="end">VCC</text>
+<rect x="230" y="313" width="50" height="14" fill="#111"/><text x="205" y="342" fill="#fff" text-anchor="end">GND</text>
+<rect x="230" y="393" width="50" height="14" fill="#16a34a"/><text x="205" y="388" fill="#fff" text-anchor="end">DO</text>
+</g>
+<!-- jumpers (male-female) -->
+<path d="M280 240 H430" stroke="#dc2626" stroke-width="8"/>
+<path d="M280 320 H430" stroke="#111" stroke-width="8"/>
+<path d="M280 400 H430" stroke="#16a34a" stroke-width="8"/>
+<text x="355" y="228" font-size="13" text-anchor="middle">male-female jumper</text>
+<!-- breadboard rows -->
+<g font-size="16" font-weight="bold">
+<rect x="430" y="215" width="200" height="50" rx="6" fill="#fde68a" stroke="#92400e"/>
+<text x="530" y="246" text-anchor="middle">ROW A (already 3.3V)</text>
+<rect x="430" y="295" width="200" height="50" rx="6" fill="#e5e7eb" stroke="#111"/>
+<text x="530" y="326" text-anchor="middle">GROUND ROW</text>
+<rect x="430" y="375" width="200" height="50" rx="6" fill="#bbf7d0" stroke="#166534"/>
+<text x="530" y="406" text-anchor="middle">NEW EMPTY ROW</text>
+</g>
+<text x="530" y="200" font-size="13" text-anchor="middle">same side of centre channel for each row</text>
+<!-- to ESP -->
+<path d="M630 240 H720" stroke="#dc2626" stroke-width="6" stroke-dasharray="10 6"/>
+<path d="M630 320 H720" stroke="#111" stroke-width="6" stroke-dasharray="10 6"/>
+<path d="M630 400 H720" stroke="#16a34a" stroke-width="6"/>
+<g font-size="15">
+<rect x="720" y="215" width="240" height="50" rx="6" fill="#f3f4f6" stroke="#999"/>
+<text x="840" y="236" text-anchor="middle">already wired: D15 jumper</text><text x="840" y="255" text-anchor="middle">+ probe red + resistor</text>
+<rect x="720" y="295" width="240" height="50" rx="6" fill="#f3f4f6" stroke="#999"/>
+<text x="840" y="316" text-anchor="middle">already wired: right-row GND</text><text x="840" y="335" text-anchor="middle">jumper + probe black</text>
+<rect x="720" y="375" width="240" height="50" rx="6" fill="#bbf7d0" stroke="#166534"/>
+<text x="840" y="396" text-anchor="middle" font-weight="bold">NEW: male-male jumper to</text><text x="840" y="415" text-anchor="middle" font-weight="bold">ESP32 D27 (right row, 6th pin)</text>
+</g>
+<text x="500" y="500" font-size="17" text-anchor="middle">NO 5V / VIN. Right row from USB end: VIN, GND, D13, D12, D14, D27</text>
+<text x="500" y="530" font-size="17" text-anchor="middle">Nothing on the left of the sensor (the black diode + / - holes).</text>
+</svg>

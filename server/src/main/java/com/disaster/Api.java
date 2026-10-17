@@ -1,0 +1,107 @@
+package com.disaster;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
+import java.util.*;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Bean;
+import org.springframework.data.jpa.repository.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
+interface ReadingRepo extends JpaRepository<Reading, Long> {
+    boolean existsByNodeAndBootAndSeq(String node, long boot, long seq);
+
+    @Query("select r from Reading r where r.id in (select max(x.id) from Reading x group by x.node) order by r.node")
+    List<Reading> latestPerNode();
+}
+
+interface ResourceRepo extends JpaRepository<Resource, Long> {}
+
+@RestController
+@RequestMapping("/api")
+public class Api {
+    record In(@NotBlank String node, Long boot, @NotNull Long seq,
+              @JsonProperty("level_cm") Integer levelCm, Integer rain,
+              @JsonProperty("temp_c") Double tempC, Integer smoke, Integer flame,
+              String via, Integer rssi) {}
+
+    record StatusIn(@NotNull Long id, @Pattern(regexp = "available|deployed|unavailable") String status) {}
+
+    private final ReadingRepo readings;
+    private final ResourceRepo resources;
+    private final Officer officer;
+
+    Api(ReadingRepo readings, ResourceRepo resources, Officer officer) {
+        this.readings = readings;
+        this.resources = resources;
+        this.officer = officer;
+    }
+
+    @Bean
+    CommandLineRunner seed() {
+        return a -> {
+            if (resources.count() > 0) return;
+            for (String n : List.of("Rescue boat", "Ambulance", "Fire engine", "Relief food kits")) {
+                Resource r = new Resource();
+                r.name = n;
+                r.status = "available";
+                resources.save(r);
+            }
+        };
+    }
+
+    // ponytail: fixed thresholds, per-site calibration/config when real sensors arrive
+    static List<String> alerts(Reading r) {
+        List<String> a = new ArrayList<>();
+        if (r.levelCm != null && r.levelCm >= 50) a.add("FLOOD");
+        if (r.flame != null && r.flame != 0) a.add("FIRE");
+        if (r.smoke != null && r.smoke >= 2000) a.add("SMOKE");
+        if (r.tempC != null && r.tempC >= 50) a.add("HEAT");
+        if (r.rain != null && r.rain >= 80) a.add("HEAVY_RAIN");
+        return a;
+    }
+
+    /** Duplicates (same node/boot/seq, e.g. LoRa copy + later Wi-Fi replay) are ignored. */
+    @PostMapping("/readings")
+    public Map<String, Boolean> ingest(@Valid @RequestBody In in) {
+        long boot = in.boot() == null ? 0 : in.boot();
+        if (readings.existsByNodeAndBootAndSeq(in.node(), boot, in.seq())) return Map.of("stored", false);
+        Reading r = new Reading();
+        r.node = in.node(); r.boot = boot; r.seq = in.seq();
+        r.recv = System.currentTimeMillis() / 1000.0;
+        r.via = in.via() == null ? "wifi" : in.via();
+        r.rssi = in.rssi(); r.levelCm = in.levelCm(); r.rain = in.rain();
+        r.tempC = in.tempC(); r.smoke = in.smoke(); r.flame = in.flame();
+        readings.save(r);
+        officer.raise(r);
+        return Map.of("stored", true);
+    }
+
+    @GetMapping("/state")
+    public Map<String, Object> state() {
+        List<Map<String, Object>> nodes = new ArrayList<>();
+        for (Reading r : readings.latestPerNode()) {
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("level_cm", r.levelCm); data.put("rain", r.rain); data.put("temp_c", r.tempC);
+            data.put("smoke", r.smoke); data.put("flame", r.flame);
+            Map<String, Object> n = new LinkedHashMap<>();
+            n.put("node", r.node); n.put("recv", r.recv); n.put("via", r.via); n.put("rssi", r.rssi);
+            n.put("data", data); n.put("alerts", alerts(r));
+            nodes.add(n);
+        }
+        return Map.of("now", System.currentTimeMillis() / 1000.0, "nodes", nodes, "incidents", officer.active(),
+                "resources", resources.findAll(org.springframework.data.domain.Sort.by("id")));
+    }
+
+    @PostMapping("/resources")
+    public Map<String, Boolean> setStatus(@Valid @RequestBody StatusIn in) {
+        Resource r = resources.findById(in.id())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        r.status = in.status();
+        resources.save(r);
+        return Map.of("ok", true);
+    }
+}
