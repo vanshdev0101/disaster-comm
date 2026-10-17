@@ -77,6 +77,8 @@ section>h2 .n{margin-left:auto;font-weight:500;color:var(--muted);font-size:12px
 .pin{position:relative;width:22px;height:22px}.pin span{position:absolute;inset:3px;border-radius:50%;background:var(--c);border:2.5px solid #fff;box-shadow:0 2px 6px #0007}
 .pin.alert::after{content:"";position:absolute;inset:0;border-radius:50%;background:var(--c);opacity:.5;animation:pulse 1.6s ease-out infinite}
 @keyframes pulse{to{transform:scale(2.4);opacity:0}}
+.me{width:18px;height:18px;border-radius:50%;background:var(--accent);border:3px solid #fff;box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 60%,transparent);animation:ring 2s infinite}
+@keyframes ring{to{box-shadow:0 0 0 16px transparent}}
 .leaflet-tooltip{background:var(--surface);color:var(--text);border:1px solid var(--border);box-shadow:var(--shadow);font:600 12px Inter,system-ui,sans-serif}
 .leaflet-tooltip-top:before{border-top-color:var(--border)}
 .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--surface);color:var(--text)}
@@ -115,7 +117,7 @@ dialog::backdrop{background:#020617aa}dialog h3{margin:0 0 4px;font-size:17px}di
       <section><h2>Field nodes <span class="n" id="nodeN"></span></h2><div id="nodes"></div></section>
     </div>
     <div class="col side">
-      <section><h2>Field map</h2>
+      <section><h2>Field map <button class="sm" id="locBtn" data-act="locate" style="margin-left:auto"></button></h2>
         <div id="mapwrap"><div id="map"></div><div class="mapmsg" id="mapmsg"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"/></svg><span id="mapmsgText" style="flex:1"></span><button class="sm" data-act="cancel-place">Cancel</button></div></div>
         <div class="legend"><span><i style="background:var(--ok)"></i>Normal</span><span><i style="background:var(--crit)"></i>Alert</span><span><i style="background:var(--off)"></i>Offline</span></div></section>
       <section><h2>Resources <span class="n" id="resN"></span></h2><div id="res"></div></section>
@@ -149,6 +151,7 @@ const ICON={
   bellOff:'<path d="M8.7 3A6 6 0 0 1 18 8c0 2.7.5 4.5 1.1 5.7M17 17H3s3-2 3-9c0-.9.2-1.7.5-2.5M10.3 21a1.94 1.94 0 0 0 3.4 0M2 2l20 20"/>',
   user:'<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
   alert:'<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01"/>',
+  locate:'<path d="M2 12h3M19 12h3M12 2v3M12 19v3"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/>',
   check:'<path d="M20 6 9 17l-5-5"/>',box:'<path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/>',
   wave:'<path d="M2 12c2.5-3 4.5-3 7 0s4.5 3 7 0 4.5-3 6 0M2 18c2.5-3 4.5-3 7 0s4.5 3 7 0 4.5-3 6 0M2 6c2.5-3 4.5-3 7 0s4.5 3 7 0 4.5-3 6 0"/>'};
 const ic=(n,cls='')=>`<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICON[n]}</svg>`;
@@ -243,6 +246,24 @@ function drawMap(){
   if(pts.length&&!drawMap.fit){map.fitBounds(pts,{maxZoom:15,padding:[50,50]});drawMap.fit=true}
   map.invalidateSize();
 }
+let meMarker=null,meCircle=null,watchId=null;
+function setLocBtn(){const b=$('locBtn');b.classList.toggle('primary',watchId!=null);b.innerHTML=ic('locate')+(watchId!=null?'Stop':'My location')}
+function toggleLocate(){
+  if(watchId!=null){navigator.geolocation.clearWatch(watchId);watchId=null;if(meMarker){map.removeLayer(meMarker);map.removeLayer(meCircle);meMarker=meCircle=null}setLocBtn();return}
+  if(!navigator.geolocation||!isSecureContext){toast('Location needs https or localhost: open the dashboard at http://localhost:8000','bad');return}
+  if(!map){toast('Map is not ready (it needs Internet)','bad');return}
+  let first=true;
+  watchId=navigator.geolocation.watchPosition(p=>{
+    const ll=[p.coords.latitude,p.coords.longitude];
+    if(!meMarker){
+      meMarker=L.marker(ll,{icon:L.divIcon({className:'',iconSize:[18,18],iconAnchor:[9,9],html:'<div class="me"></div>'}),zIndexOffset:1000}).addTo(map).bindTooltip('You are here',{direction:'top',offset:[0,-10]});
+      meCircle=L.circle(ll,{radius:p.coords.accuracy,color:css('--accent'),weight:1,fillOpacity:.1}).addTo(map)}
+    else{meMarker.setLatLng(ll);meCircle.setLatLng(ll).setRadius(p.coords.accuracy)}
+    if(first){map.setView(ll,Math.max(map.getZoom(),15));first=false}},
+    err=>{toast(err.code===1?'Location permission denied':'Could not get your location','bad');watchId=null;setLocBtn()},
+    {enableHighAccuracy:true,maximumAge:5000,timeout:15000});
+  setLocBtn();
+}
 function startPlace(id){if(!me){toast('Sign in to place nodes','bad');$('loginDlg').showModal();return}placing=id;$('mapmsgText').textContent=`Click the map to place ${nodeName(state,id)}`;$('mapmsg').classList.add('show');$('map').style.cursor='crosshair';$('map').scrollIntoView({behavior:'smooth',block:'center'})}
 function stopPlace(){placing=null;$('mapmsg').classList.remove('show');$('map').style.cursor=''}
 
@@ -292,6 +313,7 @@ document.addEventListener('click',async e=>{
   else if(a==='close-dlg')b.closest('dialog').close();
   else if(a==='logout')logout();
   else if(a==='cancel-place')stopPlace();
+  else if(a==='locate')toggleLocate();
   else if(a==='place')startPlace(b.dataset.node);
   else if(a==='rename'){if(!me){toast('Sign in to rename nodes','bad');$('loginDlg').showModal();return}const nm=prompt('Node name',b.dataset.name);if(nm){await api('/api/nodes','POST',{node:b.dataset.node,name:nm});tick()}}
   else if(a==='inc'){await api(`/api/incidents/${b.dataset.id}/${b.dataset.a}`,'POST',{});tick()}
@@ -303,5 +325,5 @@ $('adminForm').addEventListener('submit',async e=>{if(!e.submitter||e.submitter.
   const r=await api('/api/officers','POST',{username:$('nu').value,password:$('np').value,role:$('nr').value});
   toast(r&&r.ok?'Officer added':'Could not add officer (name taken or password too short)',r&&r.ok?'good':'bad');$('nu').value=$('np').value=''});
 addEventListener('resize',drawCharts);
-authUI();tick();setInterval(tick,2000);setInterval(loadHistory,10000);setTimeout(loadHistory,1200);
+authUI();setLocBtn();tick();setInterval(tick,2000);setInterval(loadHistory,10000);setTimeout(loadHistory,1200);
 </script>
