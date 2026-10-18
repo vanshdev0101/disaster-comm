@@ -20,9 +20,15 @@ interface ReadingRepo extends JpaRepository<Reading, Long> {
 
     long countByIdGreaterThan(long id);
 
-    @Query("select r from Reading r where r.id in (select max(x.id) from Reading x where x.recv = "
-            + "(select max(y.recv) from Reading y where y.node = x.node) group by x.node) order by r.node")
-    List<Reading> latestPerNode();
+    @Query("select distinct r.node from Reading r")
+    List<String> nodeNames();
+
+    java.util.Optional<Reading> findFirstByNodeOrderByRecvDesc(String node);
+
+    /** Newest reading (by measurement time) of each node. Uses the (node, recv) index: cheap however many readings are stored. */
+    default List<Reading> latestPerNode() {
+        return nodeNames().stream().sorted().map(this::findFirstByNodeOrderByRecvDesc).flatMap(java.util.Optional::stream).toList();
+    }
 }
 
 interface ResourceRepo extends JpaRepository<Resource, Long> {}
@@ -103,6 +109,7 @@ public class Api {
             NodeInfo ni = info.get(r.node);
             n.put("name", ni == null || ni.name == null ? r.node : ni.name);
             n.put("lat", ni == null ? null : ni.lat); n.put("lon", ni == null ? null : ni.lon);
+            n.put("responsible", ni == null ? null : ni.responsible);
             n.put("online", now - r.recv < OFFLINE_S);
             nodes.add(n);
         }

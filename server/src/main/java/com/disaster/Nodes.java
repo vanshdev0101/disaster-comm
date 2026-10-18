@@ -12,6 +12,7 @@ class NodeInfo {
     @Id public String node;
     public String name;
     public Double lat, lon;
+    public String responsible;  // officer to notify when this node raises an incident
 }
 
 interface NodeRepo extends JpaRepository<NodeInfo, String> {}
@@ -22,13 +23,15 @@ interface NodeRepo extends JpaRepository<NodeInfo, String> {}
 public class Nodes {
     record NodeIn(@NotBlank String node, String name,
                   @DecimalMin("-90") @DecimalMax("90") Double lat,
-                  @DecimalMin("-180") @DecimalMax("180") Double lon) {}
+                  @DecimalMin("-180") @DecimalMax("180") Double lon, String responsible) {}
 
     private final NodeRepo nodes;
     private final ReadingRepo readings;
     private final Audit audit;
+    private final AccountRepo accounts;
 
-    Nodes(NodeRepo nodes, ReadingRepo readings, Audit audit) {
+    Nodes(NodeRepo nodes, ReadingRepo readings, Audit audit, AccountRepo accounts) {
+        this.accounts = accounts;
         this.nodes = nodes;
         this.readings = readings;
         this.audit = audit;
@@ -40,6 +43,11 @@ public class Nodes {
         NodeInfo n = nodes.findById(in.node()).orElseGet(() -> { NodeInfo x = new NodeInfo(); x.node = in.node(); return x; });
         if (in.name() != null && !in.name().isBlank()) n.name = in.name().trim();
         if (in.lat() != null && in.lon() != null) { n.lat = in.lat(); n.lon = in.lon(); }
+        if (in.responsible() != null) {  // empty string clears it
+            if (!in.responsible().isBlank() && !accounts.existsById(in.responsible()))
+                throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "no such officer");
+            n.responsible = in.responsible().isBlank() ? null : in.responsible();
+        }
         nodes.save(n);
         audit.log(who, "updated node " + in.node());
         return Map.of("ok", true);

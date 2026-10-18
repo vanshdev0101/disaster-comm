@@ -27,6 +27,22 @@ cd server
 - **History charts:** water level, temperature and rain for the last 30 minutes.
 - **Alerts:** press "Alerts: on" for a beep, banner and browser notification on new incidents or a node going offline.
 
+## Officer notification (Telegram)
+When an incident opens, the responsible officer is messaged on Telegram: severity, hazard, node, the reading against its
+threshold, observed time, incident ID and a dashboard link. Who is told: the node's **responsible officer** if one is set,
+otherwise every linked officer who is **on duty**. The officer who acknowledges an incident becomes responsible for it, or
+an officer can **assign** it to someone else, who is messaged too. Messages wait in a queue and are retried while Telegram
+is unreachable. It is off unless a bot token is set.
+
+Setup (one time): in Telegram message **@BotFather**, send `/newbot`, copy the token. Start the server with it
+(keep the token out of git):
+```
+DISASTER_TELEGRAM_TOKEN=123456:ABC... DISASTER_PUBLIC_URL=http://192.168.1.10:8000 java -jar target/server-0.0.1-SNAPSHOT.jar
+```
+Each officer: sign in, press **Notifications**, **Link Telegram**, and send the bot `/link CODE`. In the Instrument readings
+panel, pick a node's **Owner**. Note Telegram needs Internet, so during a total outage the dashboard sound and the on-screen
+alert are the channel; queued messages go out when the Internet returns.
+
 ## Cloud storage (store-and-forward)
 Readings always go to the control station's local database first. When a cloud server is configured, the station uploads
 everything the cloud has not yet confirmed (every 10 s, plus a snapshot of incidents/resources), keeps it queued while the

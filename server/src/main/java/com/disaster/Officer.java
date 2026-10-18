@@ -32,8 +32,12 @@ public class Officer {
     private final ResourceRepo resources;
     private final Audit audit;
     private final Thresholds thresholds;
+    private final Notifier notifier;
+    private final AccountRepo accounts;
 
-    Officer(IncidentRepo incidents, ResourceRepo resources, Audit audit, Thresholds thresholds) {
+    Officer(IncidentRepo incidents, ResourceRepo resources, Audit audit, Thresholds thresholds, Notifier notifier, AccountRepo accounts) {
+        this.notifier = notifier;
+        this.accounts = accounts;
         this.incidents = incidents;
         this.resources = resources;
         this.audit = audit;
@@ -47,6 +51,7 @@ public class Officer {
             Incident i = new Incident();
             i.node = r.node; i.type = type; i.opened = r.recv; i.status = "open";
             incidents.save(i);
+            notifier.incidentOpened(i, r);
         }
     }
 
@@ -59,7 +64,7 @@ public class Officer {
         }
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", i.id); m.put("node", i.node); m.put("type", i.type);
-        m.put("opened", i.opened); m.put("status", i.status);
+        m.put("opened", i.opened); m.put("status", i.status); m.put("assignedTo", i.assignedTo);
         m.put("assigned", assigned); m.put("suggested", suggested);
         return m;
     }
@@ -83,11 +88,30 @@ public class Officer {
         return i;
     }
 
+    /** Whoever first acts on an incident becomes the responsible officer, unless one was already assigned. */
+    private void claim(Incident i, String who) {
+        if (i.assignedTo == null && who != null) { i.assignedTo = who; i.assignedAt = System.currentTimeMillis() / 1000.0; }
+    }
+
+    record AssignIn(@jakarta.validation.constraints.NotBlank String officer) {}
+
+    @PostMapping("/{id}/assign")
+    public Map<String, Boolean> assign(@PathVariable Long id, @Valid @RequestBody AssignIn in,
+                                       @RequestAttribute(value = "officer", required = false) String who) {
+        Incident i = get(id, true);
+        if (!accounts.existsById(in.officer())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "no such officer");
+        i.assignedTo = in.officer(); i.assignedAt = System.currentTimeMillis() / 1000.0;
+        incidents.save(i);
+        audit.log(who, "assigned " + i.type + " on " + i.node + " to " + in.officer());
+        if (!in.officer().equals(who)) notifier.assigned(i, in.officer(), who);
+        return Map.of("ok", true);
+    }
+
     @PostMapping("/{id}/ack")
     public Map<String, Boolean> ack(@PathVariable Long id,
                                     @RequestAttribute(value = "officer", required = false) String who) {
         Incident i = get(id, true);
-        if ("open".equals(i.status)) { i.status = "acknowledged"; incidents.save(i); audit.log(who, "acknowledged " + i.type + " on " + i.node); }
+        if ("open".equals(i.status)) { i.status = "acknowledged"; claim(i, who); incidents.save(i); audit.log(who, "acknowledged " + i.type + " on " + i.node); }
         return Map.of("ok", true);
     }
 
@@ -103,7 +127,7 @@ public class Officer {
         r.status = "deployed"; r.incident = i.id;
         resources.save(r);
         audit.log(who, "sent " + r.name + " to " + i.type + " on " + i.node);
-        if ("open".equals(i.status)) { i.status = "acknowledged"; incidents.save(i); }  // acting on it implies ack
+        if ("open".equals(i.status)) { i.status = "acknowledged"; claim(i, who); incidents.save(i); }  // acting on it implies ack
         return Map.of("ok", true);
     }
 

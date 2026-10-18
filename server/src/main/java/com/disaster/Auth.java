@@ -8,6 +8,7 @@ import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,6 +25,8 @@ import org.springframework.web.servlet.config.annotation.*;
 class Account {
     @Id public String username;
     public String salt, hash, role;  // role: admin | officer
+    public String telegramChatId;  // set by linking from Telegram, see Notifier
+    public Boolean onDuty;  // null counts as on duty
 }
 
 interface AccountRepo extends JpaRepository<Account, String> {}
@@ -92,6 +95,18 @@ public class Auth implements WebMvcConfigurer {
         String t = bearer(req);
         if (t != null) sessions.remove(t);
         return Map.of("ok", true);
+    }
+
+    /** Who can be assigned and notified. Names are only shown to signed-in officers. */
+    @GetMapping("/officers")
+    public List<Map<String, Object>> officers(HttpServletRequest req) {
+        if (who(req) == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "login required");
+        return accounts.findAll().stream().sorted(Comparator.comparing((Account a) -> a.username)).map(a -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("username", a.username); m.put("role", a.role);
+            m.put("linked", a.telegramChatId != null); m.put("onDuty", a.onDuty == null || a.onDuty);
+            return m;
+        }).collect(Collectors.toList());
     }
 
     @PostMapping("/officers")

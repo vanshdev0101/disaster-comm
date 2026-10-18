@@ -8,4 +8,6 @@ public class Incident {
     public String node, type;
     public double opened;  // epoch seconds
     public String status;  // open -> acknowledged -> resolved
+    public String assignedTo;  // officer responsible for it (whoever acknowledged, or who was assigned)
+    public Double assignedAt;
 }
