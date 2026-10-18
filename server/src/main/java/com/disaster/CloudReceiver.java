@@ -47,6 +47,7 @@ public class CloudReceiver {
     }
 
     @PostMapping("/ingest")
+    @org.springframework.transaction.annotation.Transactional  // one commit per batch: a commit per row is far too slow on a remote database
     public Map<String, Object> ingest(@RequestHeader(value = "X-Api-Key", required = false) String k, @Valid @RequestBody Batch b) {
         if (key.isBlank() || !MessageDigest.isEqual(key.getBytes(), (k == null ? "" : k).getBytes()))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "bad or missing API key");

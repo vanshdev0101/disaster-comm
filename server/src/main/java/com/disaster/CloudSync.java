@@ -79,7 +79,7 @@ public class CloudSync {
                         r.levelCm, r.rain, r.tempC, r.smoke, r.flame)).toList();
                 String body = json.writeValueAsString(new CloudReceiver.Batch(station, rows, snap));
                 HttpResponse<String> res = http.send(HttpRequest.newBuilder(URI.create(url + "/api/cloud/ingest"))
-                        .timeout(Duration.ofSeconds(8)).header("Content-Type", "application/json").header("X-Api-Key", key)
+                        .timeout(Duration.ofSeconds(30)).header("Content-Type", "application/json").header("X-Api-Key", key)
                         .POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
                 if (res.statusCode() != 200) throw new IllegalStateException("cloud answered " + res.statusCode());
                 if (!batch.isEmpty()) { mark = batch.get(batch.size() - 1).id; setMark(mark); }
