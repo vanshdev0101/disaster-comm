@@ -27,6 +27,22 @@ cd server
 - **History charts:** water level, temperature and rain for the last 30 minutes.
 - **Alerts:** press "Alerts: on" for a beep, banner and browser notification on new incidents or a node going offline.
 
+## Cloud storage (store-and-forward)
+Readings always go to the control station's local database first. When a cloud server is configured, the station uploads
+everything the cloud has not yet confirmed (every 10 s, plus a snapshot of incidents/resources), keeps it queued while the
+Internet is down, and catches up when it is back. The cloud ignores repeats, so retries are safe. The dashboard shows
+"Cloud sync: Synced / N queued, offline / Off".
+
+The cloud is the same app run on a hosted machine with a receiver key; its read-only page is `/cloud.html`.
+```
+# cloud (demo on this PC, port 8100):
+SERVER_PORT=8100 DISASTER_CLOUD_RECEIVER_KEY=demo-key SPRING_DATASOURCE_URL=jdbc:h2:file:./data/cloud java -jar target/server-0.0.1-SNAPSHOT.jar
+# control station, pointed at it:
+DISASTER_CLOUD_URL=http://localhost:8100 DISASTER_CLOUD_KEY=demo-key DISASTER_STATION=chennai-control java -jar target/server-0.0.1-SNAPSHOT.jar
+```
+Windows PowerShell: set the variables first, e.g. `$env:DISASTER_CLOUD_URL="http://localhost:8100"`. For a real cloud, deploy the jar to a
+host and use its https URL; use a long random key. With no `DISASTER_CLOUD_URL` the feature is off. One station per cloud instance for now.
+
 ## Windows
 Needs JDK 21 (Temurin), Git and, for the simulator, Python 3. In PowerShell:
 ```

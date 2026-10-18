@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark">
+<title>Cloud Server · Disaster Control Station</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#101418;--s1:#171d23;--s2:#1d252d;--line:#303a44;--text:#e7edf2;--mute:#94a3b0;--crit:#ef4444;--warn:#f59e0b;--ok:#22c55e;--cyan:#38bdf8}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:13px/1.4 "IBM Plex Sans",system-ui,sans-serif}.mono{font-family:"IBM Plex Mono",monospace}
+header{background:var(--s1);border-bottom:1px solid var(--line);padding:12px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}header b{font-size:14px}header small{color:var(--mute);letter-spacing:.08em;text-transform:uppercase;font-size:10.5px;display:block}
+.chip{font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:3px;border:1px solid currentColor;white-space:nowrap}.ok{color:var(--ok)}.warn{color:var(--warn)}.crit{color:var(--crit)}.info{color:var(--cyan)}.mute{color:var(--mute)}
+main{max-width:1100px;margin:0 auto;padding:12px;display:grid;gap:12px}.panel{background:var(--s1);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.ph{padding:9px 12px;border-bottom:1px solid var(--line);background:var(--s2);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;display:flex;gap:10px}.ph span{margin-left:auto;color:var(--mute);text-transform:none;letter-spacing:0;font-weight:400}
+table{width:100%;border-collapse:collapse}th{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--mute);text-align:left;padding:7px 12px;border-bottom:1px solid var(--line)}td{padding:8px 12px;border-bottom:1px solid #242d36}tr:last-child td{border:0}.r{text-align:right}.empty{padding:20px;text-align:center;color:var(--mute)}
+</style>
+<header><div><b>Cloud server</b><small>Replicated from control stations · read-only</small></div><span id="conn" class="chip warn">Connecting</span><span class="mono mute" id="meta"></span></header>
+<main id="main"><div class="empty">Loading…</div></main>
+<script>
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rel=s=>{s=Math.max(0,Math.round(s));return s<60?s+' s':s<3600?Math.floor(s/60)+' min':Math.floor(s/3600)+' h'};
+const hms=t=>new Date(t*1000).toLocaleTimeString([],{hour12:false});
+async function tick(){
+  let d;try{d=await (await fetch('/api/cloud/summary')).json();document.getElementById('conn').className='chip ok';document.getElementById('conn').textContent='Online'}
+  catch(e){document.getElementById('conn').className='chip crit';document.getElementById('conn').textContent='Unreachable';return}
+  document.getElementById('meta').textContent=`${d.readings} readings stored`;
+  document.getElementById('main').innerHTML=d.stations.map(s=>{const sn=s.snapshot||{},nodes=sn.nodes||[],inc=sn.history||[],res=sn.resources||[],age=d.now-s.receivedAt;
+    return `<section class="panel"><div class="ph">Station ${esc(s.station)}<span>last upload <b class="mono">${hms(s.receivedAt)}</b> (${rel(age)} ago)</span></div>
+    <div class="ph" style="background:none">Nodes</div><table><thead><tr><th>Node</th><th>Link</th><th class="r">Level cm</th><th class="r">Temp °C</th><th class="r">Rain %</th><th>Flame</th><th>Alerts</th></tr></thead><tbody>${nodes.map(n=>{const x=n.data||{};
+      return `<tr><td><b>${esc(n.name||n.node)}</b></td><td class="info">${esc((n.via||'').toUpperCase())}</td><td class="r mono">${x.level_cm>=0?x.level_cm:'n/a'}</td><td class="r mono">${x.temp_c??'n/a'}</td><td class="r mono">${x.rain??'n/a'}</td><td>${x.flame?'<span class="crit">DETECTED</span>':'<span class="mute">Clear</span>'}</td><td>${(n.alerts||[]).map(a=>`<span class="chip crit">${esc(a)}</span>`).join(' ')||'<span class="mute">None</span>'}</td></tr>`}).join('')||'<tr><td colspan="7" class="empty">No nodes</td></tr>'}</tbody></table>
+    <div class="ph" style="background:none">Incidents (latest 100)</div><table><thead><tr><th>ID</th><th>Hazard</th><th>Node</th><th>Status</th><th>Opened</th><th>Dispatched</th></tr></thead><tbody>${inc.map(i=>`<tr><td class="mono">INC-${String(i.id).padStart(4,'0')}</td><td>${esc(i.type)}</td><td>${esc(i.node)}</td><td><span class="chip ${i.status==='resolved'?'ok':i.status==='open'?'warn':'info'}">${esc(i.status)}</span></td><td class="mono">${new Date(i.opened*1000).toLocaleString([],{hour12:false})}</td><td>${(i.assigned||[]).map(a=>esc(a.name)).join(', ')||'<span class="mute">none</span>'}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No incidents</td></tr>'}</tbody></table>
+    <div class="ph" style="background:none">Resources</div><table><tbody>${res.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td><span class="chip ${r.status==='available'?'ok':r.status==='deployed'?'warn':'mute'}">${esc(r.status)}</span></td></tr>`).join('')}</tbody></table></section>`}).join('')||'<div class="empty">No control station has uploaded yet.</div>';
+}
+tick();setInterval(tick,3000);
+</script></html>

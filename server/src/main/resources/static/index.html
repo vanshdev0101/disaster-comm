@@ -184,7 +184,7 @@ const tsec=s=>Math.max(0,Math.round(s));
 function rel(s){s=tsec(s);if(s<60)return s+' s';if(s<3600)return Math.floor(s/60)+' min';if(s<86400)return Math.floor(s/3600)+' h '+Math.floor(s%3600/60)+' min';return Math.floor(s/86400)+' d'}
 const hms=t=>new Date(t*1000).toLocaleTimeString([], {hour12:false});
 const dtm=t=>{const d=new Date(t*1000),n=new Date();return (d.toDateString()===n.toDateString()?'':d.toLocaleDateString([], {day:'2-digit',month:'short'})+' ')+hms(t)};
-let me=null,token=null,state=null,alertsOn=false,seenInc=null,wasOnline={},history={},placing=null,map=null,markers={},actx=null,sel=null,selInc=null,lastOk=0;
+let sync=null,me=null,token=null,state=null,alertsOn=false,seenInc=null,wasOnline={},history={},placing=null,map=null,markers={},actx=null,sel=null,selInc=null,lastOk=0;
 try{const s=JSON.parse(sessionStorage.getItem('me')||'null');if(s){me=s;token=s.token}}catch(e){}
 try{alertsOn=localStorage.getItem('alerts')==='1'}catch(e){}
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
@@ -327,6 +327,13 @@ function toggleLocate(){
 }
 
 // ---------- render ----------
+function cloudStat(){
+  if(!sync||!sync.enabled)return `<div class="stat" title="No cloud server configured"><div class="k">Cloud sync</div><div class="v" style="color:var(--mute)">Off</div></div>`;
+  const age=sync.lastSync?rel(Date.now()/1000-sync.lastSync)+' ago':'never',tip=esc(`Cloud: ${sync.target}. Last upload ${age}.${sync.error?' '+sync.error:''}`);
+  if(sync.online&&sync.pending<=5)return `<div class="stat ok" title="${tip}"><div class="k">Cloud sync</div><div class="v">Synced</div></div>`;
+  if(sync.online)return `<div class="stat warn" title="${tip}"><div class="k">Cloud sync</div><div class="v">${sync.pending}<small> uploading</small></div></div>`;
+  return `<div class="stat warn" title="${tip}"><div class="k">Cloud sync</div><div class="v">${sync.pending}<small> queued, offline</small></div></div>`;
+}
 function render(){
   const s=state;if(!s)return;
   if(s.thresholds)TH=s.thresholds;
@@ -337,6 +344,7 @@ function render(){
     <div class="stat ${nw?'warn':''}"><div class="k">Warnings</div><div class="v">${nw}</div></div>
     <div class="stat"><div class="k">Nodes online</div><div class="v">${online}<small> / ${s.nodes.length}</small></div></div>
     <div class="stat"><div class="k">Units available</div><div class="v">${avail}<small> / ${s.resources.length}</small></div></div>
+    ${cloudStat()}
     <div class="stat"><div class="k">Last observation</div><div class="v">${newest==null?'—':rel(newest)}<small>${newest==null?'':' ago'}</small></div></div>`;
   $('nodeN').textContent=`${online} of ${s.nodes.length} reporting`;$('incN').textContent=s.incidents.length?`${s.incidents.length} active`:'';$('resN').textContent=`${avail} of ${s.resources.length} available`;
   const incs=[...s.incidents].sort((a,b)=>SEVRANK[kind(a.type)[2]]-SEVRANK[kind(b.type)[2]]||b.opened-a.opened);
@@ -375,6 +383,7 @@ function flashChanges(){document.querySelectorAll('[data-k]').forEach(el=>{const
 async function tick(){
   let s;try{s=await (await fetch('/api/state')).json();lastOk=Date.now();$('conn').className='chip ok';$('conn').textContent='Live'}
   catch(e){$('conn').className='chip crit';$('conn').textContent=lastOk?'Connection lost · data stale':'Server unreachable';return}
+  try{sync=await (await fetch('/api/sync')).json()}catch(e){}
   state=s;detectNew(s);render();
   if(tick.n++%5)return;
   try{const l=await (await fetch('/api/log?limit=12')).json();

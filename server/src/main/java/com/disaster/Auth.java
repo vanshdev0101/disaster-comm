@@ -121,7 +121,8 @@ public class Auth implements WebMvcConfigurer {
             public boolean preHandle(HttpServletRequest req, HttpServletResponse res, Object h) throws Exception {
                 String m = req.getMethod(), p = req.getRequestURI();
                 if (m.equals("GET") || m.equals("HEAD") || m.equals("OPTIONS")
-                        || p.equals("/api/readings") || p.equals("/api/login")) return true;
+                        || p.equals("/api/readings") || p.equals("/api/login")
+                        || p.equals("/api/cloud/ingest")) return true;  // devices and the cloud uplink use keys, not officer logins
                 Account a = who(req);
                 if (a == null) { res.sendError(401, "login required"); return false; }
                 req.setAttribute("officer", a.username);

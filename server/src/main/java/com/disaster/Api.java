@@ -16,6 +16,10 @@ interface ReadingRepo extends JpaRepository<Reading, Long> {
 
     List<Reading> findByNodeAndRecvGreaterThanOrderByRecv(String node, double recv);
 
+    List<Reading> findTop500ByIdGreaterThanOrderById(long id);
+
+    long countByIdGreaterThan(long id);
+
     @Query("select r from Reading r where r.id in (select max(x.id) from Reading x where x.recv = "
             + "(select max(y.recv) from Reading y where y.node = x.node) group by x.node) order by r.node")
     List<Reading> latestPerNode();
