@@ -5,3 +5,4 @@ __pycache__/
 firmware/include/secrets.h
 target/
 data/
+server/config/

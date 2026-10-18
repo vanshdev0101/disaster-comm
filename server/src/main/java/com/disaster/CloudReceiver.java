@@ -15,7 +15,7 @@ import tools.jackson.databind.ObjectMapper;
 @Entity
 class CloudSnapshot {
     @Id public String station;
-    @Lob public String json;  // latest incidents/resources/nodes/log of that station, as sent
+    @Column(length = 1_000_000) public String json;  // latest incidents/resources/nodes/log of that station, as sent
     public double receivedAt;
 }
 

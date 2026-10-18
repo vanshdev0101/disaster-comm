@@ -97,3 +97,17 @@ Open TCP 8000 in the PC firewall so the ESP32s can reach the backend.
 Working end to end on real hardware (Linux): node (temperature, flame, rain, water level) -> Wi-Fi -> server -> dashboard,
 and node -> LoRa (433 MHz, Ra-02) -> gateway -> server when the server/Wi-Fi is unreachable.
 Smoke (MQ-2) is not fitted: `HAVE_SMOKE 0` in `firmware/include/config.h` reports "no sensor".
+
+## Real cloud: Render + Neon Postgres
+
+The cloud is the same app, hosted. Neon keeps the data (Postgres), Render runs the jar from `server/Dockerfile`.
+
+1. **Neon** (neon.tech): create a project, copy host, database, user, password.
+2. **Render** (render.com): New > Web Service > this GitHub repo, Root Directory `server`, Runtime Docker, free plan. Environment variables:
+   - `SPRING_DATASOURCE_URL` = `jdbc:postgresql://<neon-host>/<db>?sslmode=require`
+   - `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` = from Neon
+   - `DISASTER_CLOUD_RECEIVER_KEY` = a long random string
+   - `DISASTER_ADMIN_PASSWORD` = anything strong
+3. Station side, restart the control station with:
+   `DISASTER_CLOUD_URL=https://<your-app>.onrender.com DISASTER_CLOUD_KEY=<same key> DISASTER_STATION=chennai-control`
+4. Open `https://<your-app>.onrender.com/cloud.html`. Free Render sleeps when idle (first request ~1 min); the station just retries.
