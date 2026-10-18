@@ -55,7 +55,7 @@ public class Nodes {
             Reading r = all.get(i);
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("t", r.recv); m.put("seq", r.seq); m.put("level_cm", r.levelCm); m.put("rain", r.rain);
-            m.put("temp_c", r.tempC); m.put("via", r.via);
+            m.put("temp_c", r.tempC); m.put("flame", r.flame); m.put("via", r.via);
             out.add(m);
         }
         return out;

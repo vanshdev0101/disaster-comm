@@ -80,7 +80,8 @@ tbody tr.sel td:not(:first-child){box-shadow:none}.nm{font-weight:600}.id{font:1
 .chg{animation:chg .9s ease-out}@keyframes chg{from{background:#38bdf83d}to{background:transparent}}
 
 /* ---- charts ---- */
-.charts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0}
+.charts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0}
+@media (max-width:1000px){.charts{grid-template-columns:repeat(2,minmax(0,1fr))}.chart:nth-child(2n){border-right:0}}
 .chart{padding:10px 12px;border-right:1px solid var(--line-2);min-width:0}.chart:last-child{border-right:0}
 .chart .h{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}.chart .h b{font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:600}.chart .h span{font-size:11px;color:var(--mute)}
 .chart .cur{margin-left:auto;font:500 15px var(--mono)}.chart canvas{width:100%;height:150px;display:block}
@@ -260,10 +261,27 @@ function chart(c,rows,key,now,{thr,unit,skipNeg}){
   for(const p of pts)if(thr!=null&&p.v>=thr){x.fillStyle=crit;x.beginPath();x.arc(X(p.t),Y(p.v),2.4,0,7);x.fill()}
   const l=pts[pts.length-1];x.fillStyle=cyan;x.beginPath();x.arc(X(l.t),Y(l.v),3.2,0,7);x.fill();
 }
+// flame is on/off, so it is drawn as a timeline: red where the sensor reported a flame
+function flameStrip(c,rows,now){
+  const dpr=devicePixelRatio||1,W=c.clientWidth,H=c.clientHeight;if(!W)return;c.width=W*dpr;c.height=H*dpr;
+  const x=c.getContext('2d');x.scale(dpr,dpr);
+  const L=40,R=8,T=8,B=20,w=W-L-R,h=H-T-B,t1=now,t0=now-30*60,X=t=>L+(t-t0)/(t1-t0)*w,Y=v=>T+h-v*h;
+  const mute=css('--mute'),line=css('--line'),cyan=css('--cyan'),crit=css('--crit');
+  const pts=rows.filter(r=>r.flame!=null&&r.t>=t0);
+  x.font='10.5px "IBM Plex Mono",monospace';x.textBaseline='middle';x.strokeStyle=line;x.lineWidth=1;x.fillStyle=mute;x.textAlign='right';
+  [[1,'yes'],[0,'no']].forEach(([v,l])=>{const y=Math.round(Y(v))+.5;x.beginPath();x.moveTo(L,y);x.lineTo(W-R,y);x.stroke();x.fillText(l,L-6,Y(v))});
+  x.textAlign='center';[[0,'−30 min'],[.5,'−15'],[1,'now']].forEach(([f,l])=>x.fillText(l,L+f*w+(f===0?14:f===1?-8:0),H-8));
+  if(!pts.length){x.fillText('No data in the last 30 minutes',L+w/2,T+h/2);return}
+  pts.forEach((p,i)=>{if(p.flame){const nx=i+1<pts.length?pts[i+1].t:p.t+3;x.fillStyle=crit+'55';x.fillRect(X(p.t),T,Math.max(2,X(nx)-X(p.t)),h)}});
+  x.strokeStyle=cyan;x.lineWidth=1.5;x.beginPath();
+  pts.forEach((p,i)=>{const px=X(p.t),py=Y(p.flame?1:0);if(i===0)x.moveTo(px,py);else{x.lineTo(px,Y(pts[i-1].flame?1:0));x.lineTo(px,py)}});x.lineTo(X(pts[pts.length-1].t),Y(pts[pts.length-1].flame?1:0));x.stroke();
+  if(!pts.some(p=>p.flame)){x.fillStyle=mute;x.fillText('No flame detected in this period',L+w/2,T+h/2-14)}
+}
 const CHS=[['level_cm','Water level','cm',null,true],['temp_c','Temperature','°C',null,false],['rain','Rain','%',null,false]];
 function drawCharts(){
   if(!state||!sel)return;const rows=history[sel]||[];
   for(const [k,,u,th,sk] of CHS){const c=$('ch-'+k);if(c)chart(c,rows,k,state.now,{thr:TH[k],unit:u,skipNeg:sk})}
+  const f=$('ch-flame');if(f)flameStrip(f,rows,state.now);
 }
 async function loadHistory(){if(!state)return;
   for(const n of state.nodes){try{history[n.node]=await (await fetch(`/api/history?node=${encodeURIComponent(n.node)}&minutes=30`)).json()}catch(e){}}drawCharts()}
@@ -345,7 +363,8 @@ function render(){
   $('selBtns').innerHTML=sn?`<button data-act="place" data-node="${esc(sn.node)}">${ic('pin')}${sn.lat==null?'Place on map':'Move on map'}</button> <button class="ghost" data-act="rename" data-node="${esc(sn.node)}" data-name="${esc(sn.name)}">Rename</button>`:'';
   if(sn){const d=sn.data;
     $('charts').innerHTML=`<div class="charts">${CHS.map(([k,l,u,_,sk])=>{const th=TH[k],val=d[k],bad=val==null||(sk&&val<0);
-      return `<div class="chart"><div class="h"><b>${l}</b><span>${u}</span><span class="cur ${!bad&&val>=th?'over':''}" data-k="c:${k}" data-v="${val}">${bad?'<span class="na">n/a</span>':val}</span></div><canvas id="ch-${k}"></canvas></div>`}).join('')}</div>`;
+      return `<div class="chart"><div class="h"><b>${l}</b><span>${u}</span><span class="cur ${!bad&&val>=th?'over':''}" data-k="c:${k}" data-v="${val}">${bad?'<span class="na">n/a</span>':val}</span></div><canvas id="ch-${k}"></canvas></div>`}).join('')}
+      <div class="chart"><div class="h"><b>Flame</b><span>sensor</span><span class="cur ${d.flame?'over':''}" data-k="c:flame" data-v="${d.flame}">${d.flame==null?'<span class="na">n/a</span>':d.flame?'DETECTED':'CLEAR'}</span></div><canvas id="ch-flame"></canvas></div></div>`;
   }else $('charts').innerHTML='<div class="empty">Select a node to see its instrument readings.</div>';
   if(!document.activeElement||document.activeElement.tagName!=='SELECT')
     $('res').innerHTML=`<table class="res"><tbody>${s.resources.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td><span class="chip ${r.status==='available'?'ok':r.status==='deployed'?'warn':'off'}">${esc(r.status)}</span></td><td><select data-res="${r.id}" aria-label="Status of ${esc(r.name)}">${['available','deployed','unavailable'].map(o=>`<option ${o==r.status?'selected':''}>${o}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table>`;
