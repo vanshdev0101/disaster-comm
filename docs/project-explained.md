@@ -35,6 +35,8 @@ There are **three kinds of devices**:
 - **Gateway:** a second ESP32 with a LoRa radio. It listens for radio messages and forwards them to the server over Wi-Fi.
 - **Control station:** a laptop (or any computer) running the server and the dashboard that officers use in a browser.
 
+Two further parts sit around them: a **Telegram bot** that messages the responsible officer, and a **hosted cloud copy** (Render with a Neon Postgres database) that keeps a second copy of the data off the laptop.
+
 ## 4. How the whole system works, step by step
 
 1. **Sense.** Every 3 seconds the node reads the temperature probe, flame sensor, rain plate and ultrasonic sensor. It packs the values into a short JSON message with a unique ID made of the node name, a random boot ID and a counter (`node1`, boot, sequence number).
@@ -45,6 +47,8 @@ There are **three kinds of devices**:
 6. **No duplicates.** The same reading may arrive twice (once by LoRa, once by replay). The server recognises the repeated (node, boot, sequence) ID and **stores it only once**.
 7. **Decide.** The server compares each reading with the **alert thresholds** (for example flood at 50 cm of water, flame detected, temperature 50 °C, rain 80 %). A reading over a limit opens an **incident** (one open incident per node and hazard type, so a sensor that stays in alarm does not spam).
 8. **Respond.** The dashboard shows the incident at the top with a severity label, plays an alert sound if enabled, and **suggests the resources** that fit the hazard (for example a rescue boat and relief kits for a flood). An officer signs in, acknowledges, dispatches resources, and resolves the incident. Each action is written to an activity log with the officer's name.
+9. **Notify.** When an incident opens, the **responsible officer is messaged on Telegram** with the hazard, node, reading and a link to the dashboard.
+10. **Back up to the cloud.** Every 10 seconds the control station uploads new readings and a snapshot of incidents and resources to the hosted cloud. If the Internet is down the data waits and is uploaded later.
 
 ![Fallback logic and server pipeline](file:///home/vanshc/disaster-comm/docs/img/fallback-flow.png){: style="width:100%"}
 
@@ -121,7 +125,16 @@ Analog sensors use pins on the ESP32's ADC1, because the ADC2 pins cannot be use
 - **Alert rules and incidents:** configurable thresholds; one open incident per node and hazard type.
 - **Suggested resources:** a rule table: flood to rescue boat and relief kits; fire to fire engine and ambulance; smoke to fire engine; high temperature to ambulance.
 - **Officer login and audit log:** passwords are stored as salted **PBKDF2** hashes, never as plain text. Viewing is open, and every change needs a login. Every action is recorded with the officer's name.
-- **Tests:** five automated tests cover ingest, duplicates, the officer workflow, login rules, thresholds and replay timing.
+- **Tests:** nine automated tests cover ingest, duplicates, the officer workflow, login rules, thresholds, replay timing, cloud upload and Telegram notification.
+
+#### Telegram officer notification
+A Telegram bot sends the alert. The recipient is the node's **responsible officer**, or all linked officers who are on duty. An officer links their own Telegram account once by pressing *Link Telegram* in the dashboard and sending the bot a one-time code. Messages wait in a queue and are retried if Telegram is unreachable (for up to 24 hours). **Why Telegram:** free, instant, works on any phone, and needs no SMS service. It is off unless a bot token is configured, and the token is kept out of the code repository.
+
+#### Cloud storage (store-and-forward)
+The control station always stores data locally first. A background task uploads everything the cloud has not yet confirmed (up to 500 readings per batch, every 10 seconds) plus a snapshot of nodes, incidents, resources and the activity log. It moves its bookmark forward only after the cloud replies with success, so nothing is lost if the link drops. The cloud ignores repeats, so retrying is safe. The cloud is the same Spring Boot application, hosted on **Render** with a **Neon Postgres** database, and accepts uploads only with a secret API key. Officer accounts and password hashes are never uploaded. A read-only page, `/cloud.html`, shows the cloud's copy.
+
+#### USB bridge
+The gateway normally forwards over Wi-Fi. If Wi-Fi is down everywhere, a small script (`gateway-bridge.py`) reads the gateway's USB serial output and posts it to the server on the same laptop, so radio messages still reach the dashboard with no Wi-Fi at all.
 
 ### 6.3 Dashboard (web page)
 **Built with:** plain HTML, CSS and JavaScript (no framework), **Leaflet** with OpenStreetMap for the map, and charts drawn on a canvas. **Why:** no build step, loads fast on any browser, and nothing to install.
@@ -137,7 +150,8 @@ Analog sensors use pins on the ESP32's ADC1, because the ADC2 pins cannot be use
 
 | Choice | Reason |
 |---|---|
-| **Local control station**, not a cloud service | It keeps working when the Internet is down, which is exactly when it is needed. |
+| **Local control station first, cloud second** | It keeps working when the Internet is down, and the cloud adds an off-site backup that catches up when the Internet returns. |
+| **Telegram alerts** | Officers are told on their phones without needing the dashboard open. |
 | **LoRa as the backup link** | Long range and low power, and independent of Wi-Fi and mobile networks. |
 | **Wi-Fi as the primary link** | Faster and carries more data when it is available. |
 | **Flash queue and replay** | No data is lost during an outage, and nothing is duplicated afterwards. |
@@ -155,7 +169,11 @@ Analog sensors use pins on the ESP32's ADC1, because the ADC2 pins cannot be use
 | Node's Wi-Fi path cut while the gateway stays connected | The node switched to **LoRa**; 32 consecutive readings arrived through the gateway at about −52 dBm; **none missing** |
 | Wi-Fi path restored | The node returned to Wi-Fi by itself; **no duplicates**, no gaps |
 | Server taken offline for 40 seconds | All 31 readings made during it were stored after recovery, **none missing, none duplicated**, with correct times |
-| Automated server tests | 5 of 5 pass |
+| Whole Wi-Fi down (node and gateway), USB bridge running | Readings still reached the dashboard over LoRa, in order |
+| Cloud unreachable, then restored | The station kept working, queued the readings and uploaded them on return (4,347 readings synced) |
+| Telegram alert | A test alert reached an officer's phone |
+| Setup on a second (Windows) laptop with the phone hotspot as Wi-Fi | Both boards flashed, LoRa fallback and cloud sync worked |
+| Automated server tests | 9 of 9 pass |
 
 ## 9. Limits and honest notes
 
@@ -164,13 +182,16 @@ Analog sensors use pins on the ESP32's ADC1, because the ADC2 pins cannot be use
 - **Frequency:** the 433 MHz modules are fine for a prototype, but a real deployment in India should use the licence-exempt 865–867 MHz band.
 - **It is a breadboard prototype.** A field unit needs a proper board, a weatherproof case and a battery or solar supply.
 - **Thresholds and the sonar mounting height are bench values** and need calibration at a real site.
-- **No SMS or phone alerts yet.** Notifications are on the dashboard only.
+- **Telegram needs Internet.** During a total outage the dashboard sound and banner are the channel; queued messages go out when the Internet returns. The queue is held in memory, so a restart loses unsent messages.
+- **Alert rules run on the server**, not on the ESP32, so a reading must reach the server before it can raise an alert.
+- **One station per cloud**, and the cloud page has no login. The free hosting sleeps when idle.
+- **Wi-Fi details are compiled into the firmware**, so a new network needs a reflash.
 - **Security is LAN-level.** There is a login and audit trail, but the default admin password must be changed, and the system is not designed to be exposed to the open Internet.
 - **The map needs Internet** for map tiles. Everything else works offline.
 
 ## 10. Possible next steps
 
-SMS or Telegram alerts to officers; the MQ-2 smoke sensor; solar power and battery monitoring; more nodes and a gateway at a high point; an outdoor range test; moving to the 865–867 MHz band; and a printed circuit board in a sealed enclosure.
+Alert decisions on the ESP32 itself; an installable phone app; the MQ-2 smoke sensor; solar power and battery monitoring; more nodes and a gateway at a high point; an outdoor range test; moving to the 865–867 MHz band; and a printed circuit board in a sealed enclosure.
 
 ## Glossary
 

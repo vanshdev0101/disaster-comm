@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" width="1200" height="620" font-family="Helvetica, Arial, sans-serif">
+<defs>
+<marker id="a" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto"><path d="M1,1 L13,7 L1,13 Z" fill="#334155"/></marker>
+<marker id="g" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto"><path d="M1,1 L13,7 L1,13 Z" fill="#15803d"/></marker>
+<marker id="o" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto"><path d="M1,1 L13,7 L1,13 Z" fill="#c2410c"/></marker>
+<marker id="p" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto"><path d="M1,1 L13,7 L1,13 Z" fill="#7c3aed"/></marker>
+</defs>
+<rect width="1200" height="620" fill="#fff"/>
+<!-- sensors -->
+<rect x="20" y="60" width="210" height="300" rx="12" fill="#ecfdf5" stroke="#166534" stroke-width="2"/>
+<text x="125" y="92" text-anchor="middle" font-size="18" font-weight="700">SENSORS</text>
+<g font-size="14" text-anchor="middle"><text x="125" y="135">DS18B20 temperature</text><text x="125" y="170">Flame sensor (IR)</text><text x="125" y="205">Rain plate + board</text><text x="125" y="240">HC-SR04 ultrasonic</text><text x="125" y="260">(water level)</text><text x="125" y="320" fill="#64748b">MQ-2 smoke: supported,</text><text x="125" y="338" fill="#64748b">not fitted</text></g>
+<!-- node -->
+<rect x="290" y="110" width="210" height="190" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+<text x="395" y="142" text-anchor="middle" font-size="18" font-weight="700">SENSOR NODE</text>
+<g font-size="14" text-anchor="middle"><text x="395" y="176">ESP32 + Ra-02 LoRa</text><text x="395" y="204">reads every 3 s</text><text x="395" y="232">unique ID per reading</text><text x="395" y="260">flash backlog (200)</text><text x="395" y="282">replay with true age</text></g>
+<line x1="230" y1="200" x2="288" y2="200" stroke="#334155" stroke-width="3" marker-end="url(#a)"/>
+<!-- control station -->
+<rect x="730" y="60" width="450" height="270" rx="12" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+<text x="955" y="92" text-anchor="middle" font-size="18" font-weight="700">CONTROL STATION (laptop)</text>
+<g font-size="14" text-anchor="middle"><text x="955" y="126">Spring Boot (Java) REST API, de-duplication</text><text x="955" y="154">H2 database: readings, incidents, resources</text><text x="955" y="182">Alert rules (editable thresholds) → incidents</text><text x="955" y="210">Officer login (PBKDF2) + audit log</text><text x="955" y="238">Web dashboard: map, charts, incident queue</text><text x="955" y="266">Telegram notifier (queue + retry)</text><text x="955" y="294">Cloud sync (store-and-forward, every 10 s)</text></g>
+<!-- wifi path -->
+<line x1="500" y1="150" x2="728" y2="150" stroke="#15803d" stroke-width="4" marker-end="url(#g)"/>
+<text x="614" y="138" text-anchor="middle" font-size="14" font-weight="700" fill="#15803d">Wi-Fi (normal path)</text>
+<!-- lora path -->
+<line x1="500" y1="250" x2="560" y2="250" stroke="#c2410c" stroke-width="4" stroke-dasharray="10 6" marker-end="url(#o)"/>
+<rect x="562" y="215" width="150" height="70" rx="10" fill="#fffbeb" stroke="#d97706" stroke-width="2"/>
+<text x="637" y="243" text-anchor="middle" font-size="15" font-weight="700">LoRa GATEWAY</text><text x="637" y="265" text-anchor="middle" font-size="13">ESP32 + Ra-02</text>
+<line x1="712" y1="250" x2="728" y2="250" stroke="#c2410c" stroke-width="4" stroke-dasharray="10 6" marker-end="url(#o)"/>
+<text x="290" y="338" font-size="13" fill="#c2410c" font-weight="700">LoRa 433 MHz (when Wi-Fi/server fails)</text>
+<text x="290" y="358" font-size="12" fill="#475569">gateway → server by Wi-Fi, or by USB bridge when there is no Wi-Fi at all</text>
+<!-- officers -->
+<rect x="730" y="400" width="210" height="150" rx="12" fill="#fef2f2" stroke="#dc2626" stroke-width="2"/>
+<text x="835" y="432" text-anchor="middle" font-size="18" font-weight="700">OFFICERS</text>
+<g font-size="13" text-anchor="middle"><text x="835" y="462">dashboard in browser</text><text x="835" y="482">Telegram alert on phone</text><text x="835" y="502">acknowledge, allocate,</text><text x="835" y="522">assign, resolve</text></g>
+<line x1="835" y1="330" x2="835" y2="398" stroke="#334155" stroke-width="3" marker-end="url(#a)"/>
+<!-- cloud -->
+<rect x="990" y="400" width="190" height="150" rx="12" fill="#ecfeff" stroke="#0e7490" stroke-width="2"/>
+<text x="1085" y="432" text-anchor="middle" font-size="18" font-weight="700">CLOUD</text>
+<g font-size="13" text-anchor="middle"><text x="1085" y="462">Render (hosted app)</text><text x="1085" y="482">Neon Postgres database</text><text x="1085" y="502">API-key protected</text><text x="1085" y="522">read-only cloud page</text></g>
+<line x1="1085" y1="330" x2="1085" y2="398" stroke="#7c3aed" stroke-width="3" stroke-dasharray="3 0" marker-end="url(#p)"/>
+<text x="1075" y="372" text-anchor="end" font-size="12" fill="#7c3aed">catch-up after outage</text>
+</svg>
